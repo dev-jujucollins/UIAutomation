@@ -352,13 +352,6 @@ uv add <package>
 uv add --dev <package>
 ```
 
-## Contributing
-
-1. Follow the existing code style
-2. Add tests for new features
-3. Update documentation as needed
-4. Run formatters before committing: `uv run black src tests && uv run isort src tests`
-
 ## License
 
 MIT License
