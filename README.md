@@ -4,7 +4,7 @@ iOS Native Apps UI Automation Framework using Appium and Python.
 
 ## Overview
 
-This framework provides automated testing capabilities for native iOS system apps including Settings, Safari, Contacts, Calendar, Photos, and more. It uses the Page Object Model (POM) pattern for maintainable and scalable test automation.
+This framework provides automated testing capabilities for native iOS system apps. It uses the Page Object Model (POM) pattern for maintainable and scalable test automation. Currently supports Settings and Calendar apps, with more apps planned.
 
 ## Prerequisites
 
@@ -83,12 +83,18 @@ UIAutomation/
 │   ├── pages/
 │   │   ├── __init__.py
 │   │   ├── base_page.py           # Base page object class
-│   │   └── settings/
+│   │   ├── settings/
+│   │   │   ├── __init__.py
+│   │   │   ├── settings_home.py   # Settings home page
+│   │   │   ├── wifi_settings.py   # Wi-Fi settings page
+│   │   │   ├── display_settings.py # Display & Brightness page
+│   │   │   └── general_settings.py # General settings page
+│   │   └── calendar/
 │   │       ├── __init__.py
-│   │       ├── settings_home.py   # Settings home page
-│   │       ├── wifi_settings.py   # Wi-Fi settings page
-│   │       ├── display_settings.py # Display & Brightness page
-│   │       └── general_settings.py # General settings page
+│   │       ├── calendar_home.py   # Calendar main view
+│   │       ├── calendar_onboarding.py # Onboarding flow
+│   │       ├── calendars_list.py  # Calendars list view
+│   │       └── new_event.py       # New event creation
 │   └── utils/
 │       ├── __init__.py
 │       ├── app_launcher.py        # App launching utilities
@@ -97,7 +103,8 @@ UIAutomation/
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py                # Pytest fixtures
-│   └── test_settings.py           # Settings app tests
+│   ├── test_settings.py           # Settings app tests
+│   └── test_calendar.py           # Calendar app tests
 ├── pyproject.toml                 # Project config & dependencies
 └── README.md
 ```
@@ -212,20 +219,13 @@ uv run pytest \
 
 ## Supported System Apps
 
-| App | Bundle ID | Automation Support |
-|-----|-----------|-------------------|
-| Settings | com.apple.Preferences | Full |
-| Safari | com.apple.mobilesafari | Full |
-| Contacts | com.apple.MobileAddressBook | Full |
-| Calendar | com.apple.mobilecal | Full |
-| Photos | com.apple.Photos | Medium |
-| Messages | com.apple.MobileSMS | Limited (simulator) |
-| Notes | com.apple.mobilenotes | Full |
-| Reminders | com.apple.reminders | Full |
-| Maps | com.apple.Maps | Full |
-| Clock | com.apple.mobiletimer | Full |
-| Calculator | com.apple.calculator | Full |
-| Files | com.apple.DocumentsApp | Full |
+| App | Bundle ID | Status |
+|-----|-----------|--------|
+| Settings | com.apple.Preferences | Implemented |
+| Calendar | com.apple.mobilecal | Implemented |
+| Safari | com.apple.mobilesafari | Planned |
+| Contacts | com.apple.MobileAddressBook | Planned |
+| Photos | com.apple.Photos | Planned |
 
 ## Writing Tests
 
