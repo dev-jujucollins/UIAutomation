@@ -12,28 +12,10 @@ from appium.webdriver.webdriver import WebDriver
 
 
 class SystemApps(Enum):
-    """Bundle identifiers for iOS system apps."""
+    """Bundle identifiers for iOS system apps with page object support."""
 
     SETTINGS = "com.apple.Preferences"
-    SAFARI = "com.apple.mobilesafari"
-    CONTACTS = "com.apple.MobileAddressBook"
     CALENDAR = "com.apple.mobilecal"
-    PHOTOS = "com.apple.Photos"
-    MESSAGES = "com.apple.MobileSMS"
-    PHONE = "com.apple.mobilephone"
-    FACETIME = "com.apple.facetime"
-    MAIL = "com.apple.mobilemail"
-    NOTES = "com.apple.mobilenotes"
-    REMINDERS = "com.apple.reminders"
-    CLOCK = "com.apple.mobiletimer"
-    MAPS = "com.apple.Maps"
-    WEATHER = "com.apple.weather"
-    CALCULATOR = "com.apple.calculator"
-    CAMERA = "com.apple.camera"
-    APP_STORE = "com.apple.AppStore"
-    HEALTH = "com.apple.Health"
-    WALLET = "com.apple.Passbook"
-    FILES = "com.apple.DocumentsApp"
 
 
 @dataclass
@@ -152,74 +134,6 @@ class IOSDriver:
         if self._driver:
             self._driver.quit()
             self._driver = None
-
-    def launch_app(self, app: SystemApps) -> None:
-        """
-        Launch a system app by its enum value.
-
-        Args:
-            app: SystemApps enum value.
-        """
-        self.driver.activate_app(app.value)
-
-    def launch_app_by_bundle_id(self, bundle_id: str) -> None:
-        """
-        Launch an app by its bundle identifier.
-
-        Args:
-            bundle_id: The app's bundle identifier.
-        """
-        self.driver.activate_app(bundle_id)
-
-    def terminate_app(self, app: SystemApps) -> bool:
-        """
-        Terminate a running app.
-
-        Args:
-            app: SystemApps enum value.
-
-        Returns:
-            True if the app was terminated, False otherwise.
-        """
-        return self.driver.terminate_app(app.value)
-
-    def is_app_installed(self, app: SystemApps) -> bool:
-        """
-        Check if an app is installed.
-
-        Args:
-            app: SystemApps enum value.
-
-        Returns:
-            True if installed, False otherwise.
-        """
-        return self.driver.is_app_installed(app.value)
-
-    def get_app_state(self, app: SystemApps) -> int:
-        """
-        Get the state of an app.
-
-        Args:
-            app: SystemApps enum value.
-
-        Returns:
-            App state code:
-            - 0: Not installed
-            - 1: Not running
-            - 2: Running in background (suspended)
-            - 3: Running in background
-            - 4: Running in foreground
-        """
-        return self.driver.query_app_state(app.value)
-
-    def background_app(self, seconds: int = -1) -> None:
-        """
-        Put the app in the background.
-
-        Args:
-            seconds: How long to background. -1 means indefinitely.
-        """
-        self.driver.background_app(seconds)
 
     def __enter__(self) -> "IOSDriver":
         """Context manager entry."""

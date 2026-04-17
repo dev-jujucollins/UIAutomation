@@ -97,14 +97,15 @@ UIAutomation/
 │   │       └── new_event.py       # New event creation
 │   └── utils/
 │       ├── __init__.py
-│       ├── app_launcher.py        # App launching utilities
-│       ├── element_helpers.py     # Element interaction helpers
-│       └── wait_helpers.py        # Custom wait utilities
+│       └── app_launcher.py        # App launching utilities
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py                # Pytest fixtures
 │   ├── test_settings.py           # Settings app tests
 │   └── test_calendar.py           # Calendar app tests
+├── scripts/
+│   ├── conftest.py                # Reuses tests/ fixtures
+│   └── inspect_locators.py        # Dev tool: capture page source XML
 ├── pyproject.toml                 # Project config & dependencies
 └── README.md
 ```
@@ -223,9 +224,8 @@ uv run pytest \
 |-----|-----------|--------|
 | Settings | com.apple.Preferences | Implemented |
 | Calendar | com.apple.mobilecal | Implemented |
-| Safari | com.apple.mobilesafari | Planned |
-| Contacts | com.apple.MobileAddressBook | Planned |
-| Photos | com.apple.Photos | Planned |
+
+To add support for a new app, add it to the `SystemApps` enum in `src/drivers/ios_driver.py`, create page objects under `src/pages/<app>/`, and add a fixture in `tests/conftest.py`.
 
 ## Writing Tests
 
@@ -316,12 +316,13 @@ print(page.get_page_source())
 
 # Take screenshot
 page.take_screenshot("debug_screenshot.png")
+```
 
-# Get element attributes
-from src.utils.element_helpers import ElementHelpers
-helpers = ElementHelpers(driver)
-attrs = helpers.get_element_attributes(element)
-print(attrs)
+To discover locators for a new screen, use the `scripts/inspect_locators.py`
+tool — it dumps XML page source for each app screen to `debug_output/`:
+
+```bash
+uv run pytest scripts/inspect_locators.py -v -k wifi
 ```
 
 ## Development

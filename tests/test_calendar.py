@@ -259,7 +259,7 @@ class TestCalendarOnboarding:
         (which auto-dismisses onboarding), manually dismisses onboarding,
         and verifies the main screen is reached.
         """
-        app_launcher.launch_calendar()
+        app_launcher.launch(SystemApps.CALENDAR)
 
         onboarding = CalendarOnboardingPage(driver)
 

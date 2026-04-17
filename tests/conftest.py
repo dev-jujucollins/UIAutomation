@@ -133,70 +133,26 @@ def app_launcher(driver) -> AppLauncher:
 
 @pytest.fixture(scope="function")
 def settings_app(driver, app_launcher: AppLauncher) -> Generator[SettingsHomePage, None, None]:
-    """
-    Launch Settings app and provide home page object.
-
-    Yields:
-        SettingsHomePage instance.
-    """
-    app_launcher.launch_settings()
+    """Launch Settings app and provide home page object."""
+    app_launcher.launch(SystemApps.SETTINGS)
     settings_home = SettingsHomePage(driver)
-
-    # Wait for Settings to be ready
     assert settings_home.is_on_settings_home(), "Failed to launch Settings app"
 
     yield settings_home
 
-    # Clean up - terminate Settings app after test
     app_launcher.terminate(SystemApps.SETTINGS)
-
-
-@pytest.fixture(scope="function")
-def safari_app(driver, app_launcher: AppLauncher) -> Generator:
-    """
-    Launch Safari and provide driver.
-
-    Yields:
-        WebDriver instance with Safari in foreground.
-    """
-    app_launcher.launch_safari()
-
-    yield driver
-
-    app_launcher.terminate(SystemApps.SAFARI)
-
-
-@pytest.fixture(scope="function")
-def contacts_app(driver, app_launcher: AppLauncher) -> Generator:
-    """
-    Launch Contacts and provide driver.
-
-    Yields:
-        WebDriver instance with Contacts in foreground.
-    """
-    app_launcher.launch_contacts()
-
-    yield driver
-
-    app_launcher.terminate(SystemApps.CONTACTS)
 
 
 @pytest.fixture(scope="function")
 def calendar_app(driver, app_launcher: AppLauncher) -> Generator:
     """
-    Launch Calendar and provide driver.
+    Launch Calendar and provide raw driver with onboarding dismissed.
 
-    Handles first-time onboarding screens automatically by dismissing
-    location permissions and any other intro screens.
-
-    Yields:
-        WebDriver instance with Calendar in foreground.
+    Use when you need direct driver access (e.g. locator inspection).
+    Prefer `calendar_home` for test code.
     """
-    app_launcher.launch_calendar()
-
-    # Handle onboarding screens (location permission, etc.)
-    onboarding = CalendarOnboardingPage(driver)
-    onboarding.dismiss_all_onboarding()
+    app_launcher.launch(SystemApps.CALENDAR)
+    CalendarOnboardingPage(driver).dismiss_all_onboarding()
 
     yield driver
 
@@ -205,42 +161,13 @@ def calendar_app(driver, app_launcher: AppLauncher) -> Generator:
 
 @pytest.fixture(scope="function")
 def calendar_home(driver, app_launcher: AppLauncher) -> Generator[CalendarHomePage, None, None]:
-    """
-    Launch Calendar app and provide home page object.
+    """Launch Calendar app and provide home page object with onboarding dismissed."""
+    app_launcher.launch(SystemApps.CALENDAR)
+    CalendarOnboardingPage(driver).dismiss_all_onboarding()
 
-    Handles first-time onboarding screens automatically by dismissing
-    location permissions and any other intro screens.
+    yield CalendarHomePage(driver)
 
-    Yields:
-        CalendarHomePage instance.
-    """
-    app_launcher.launch_calendar()
-
-    # Handle onboarding screens (location permission, notifications, etc.)
-    onboarding = CalendarOnboardingPage(driver)
-    onboarding.dismiss_all_onboarding()
-
-    calendar_page = CalendarHomePage(driver)
-
-    yield calendar_page
-
-    # Clean up - terminate Calendar app after test
     app_launcher.terminate(SystemApps.CALENDAR)
-
-
-@pytest.fixture(scope="function")
-def photos_app(driver, app_launcher: AppLauncher) -> Generator:
-    """
-    Launch Photos and provide driver.
-
-    Yields:
-        WebDriver instance with Photos in foreground.
-    """
-    app_launcher.launch_photos()
-
-    yield driver
-
-    app_launcher.terminate(SystemApps.PHOTOS)
 
 
 # -------------------------------------------------------------------------
