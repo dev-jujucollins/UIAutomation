@@ -2,7 +2,6 @@
 Settings App - Display & Brightness Settings Page Object
 """
 
-from typing import Optional
 
 from appium.webdriver.webdriver import WebDriver
 
@@ -278,7 +277,7 @@ class DisplaySettingsPage(BasePage):
         self.scroll_to_element(self.AUTO_LOCK_CELL)
         self.click(self.AUTO_LOCK_CELL)
 
-    def get_auto_lock_duration(self) -> Optional[str]:
+    def get_auto_lock_duration(self) -> str | None:
         """
         Get the current Auto-Lock duration.
 

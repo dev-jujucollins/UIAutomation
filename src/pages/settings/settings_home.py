@@ -2,12 +2,19 @@
 Settings App - Home Page Object
 """
 
-from typing import List, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from appium.webdriver.webdriver import WebDriver
 from appium.webdriver.webelement import WebElement
 
 from ..base_page import BasePage
+
+if TYPE_CHECKING:
+    from .display_settings import DisplaySettingsPage
+    from .general_settings import GeneralSettingsPage
+    from .wifi_settings import WifiSettingsPage
 
 
 class SettingsHomePage(BasePage):
@@ -163,7 +170,7 @@ class SettingsHomePage(BasePage):
     # Navigation Methods - Network Section
     # -------------------------------------------------------------------------
 
-    def go_to_wifi(self) -> "WifiSettingsPage":
+    def go_to_wifi(self) -> WifiSettingsPage:
         """
         Navigate to Wi-Fi settings.
 
@@ -218,7 +225,7 @@ class SettingsHomePage(BasePage):
     # Navigation Methods - General Section
     # -------------------------------------------------------------------------
 
-    def go_to_general(self) -> "GeneralSettingsPage":
+    def go_to_general(self) -> GeneralSettingsPage:
         """
         Navigate to General settings.
 
@@ -231,15 +238,16 @@ class SettingsHomePage(BasePage):
         self.click(self.GENERAL_CELL)
         return GeneralSettingsPage(self.driver)
 
-    def go_to_display_brightness(self) -> "DisplaySettingsPage":
+    def go_to_display_brightness(self) -> DisplaySettingsPage:
         """
         Navigate to Display & Brightness settings.
 
         Returns:
             DisplaySettingsPage instance.
         """
-        from .display_settings import DisplaySettingsPage
         from appium.webdriver.common.appiumby import AppiumBy
+
+        from .display_settings import DisplaySettingsPage
 
         # Display & Brightness requires scrolling in iOS 26+
         # Scroll down until we find it
@@ -304,7 +312,7 @@ class SettingsHomePage(BasePage):
     # Utility Methods
     # -------------------------------------------------------------------------
 
-    def get_visible_settings_cells(self) -> List[WebElement]:
+    def get_visible_settings_cells(self) -> list[WebElement]:
         """
         Get all visible settings cells.
 

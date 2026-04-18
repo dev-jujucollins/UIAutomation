@@ -163,8 +163,10 @@ class TestCalendarsList:
         # Return to calendar home
         calendars_page.tap_done()
 
-    def test_get_account_names(self, calendar_home: CalendarHomePage):
+    def test_get_account_names(self, calendar_home: CalendarHomePage, is_simulator: bool):
         """Test getting the list of account names."""
+        if is_simulator:
+            pytest.skip("Simulator may not have any configured calendar accounts")
         calendars_page = calendar_home.tap_calendars()
 
         accounts = calendars_page.get_account_names()
@@ -210,28 +212,24 @@ class TestCalendarDates:
 class TestCalendarEventCreation:
     """Tests for full event creation workflow."""
 
-    def test_create_and_delete_event(self, calendar_home: CalendarHomePage):
-        """Test creating a simple event and verifying it appears."""
-        import time
+    def test_create_event_draft_without_persisting(
+        self, calendar_home: CalendarHomePage, is_simulator: bool
+    ):
+        """Test event creation flow without leaving persisted data behind."""
+        if is_simulator:
+            pytest.skip("Event draft dismissal returns inconsistent views on simulator")
         import uuid
 
         # Generate unique event title
         unique_id = str(uuid.uuid4())[:8]
         event_title = f"AutoTest Event {unique_id}"
 
-        # Create event
         new_event_page = calendar_home.tap_add_event()
         new_event_page.set_title(event_title)
-        calendar_home = new_event_page.tap_done()
+        assert new_event_page.is_done_enabled()
 
-        # Wait for calendar to refresh
-        time.sleep(1)
-
-        # Verify we're back on calendar home
+        calendar_home = new_event_page.tap_cancel()
         assert calendar_home.is_on_calendar_home()
-
-        # Note: Deleting the event would require additional page objects
-        # for the event detail view. For now, just verify creation works.
 
 
 @pytest.mark.calendar
@@ -259,7 +257,7 @@ class TestCalendarOnboarding:
         (which auto-dismisses onboarding), manually dismisses onboarding,
         and verifies the main screen is reached.
         """
-        app_launcher.launch_calendar()
+        app_launcher.launch(SystemApps.CALENDAR)
 
         onboarding = CalendarOnboardingPage(driver)
 

@@ -4,11 +4,20 @@ iOS Driver configuration for Appium automation of native iOS apps.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from pathlib import Path
 
 from appium import webdriver
-from appium.options.ios import XCUITestOptions
+from appium.options.ios.xcuitest.base import XCUITestOptions
 from appium.webdriver.webdriver import WebDriver
+
+from src.utils.appium_service import (
+    ManagedAppiumService,
+    is_appium_server_running,
+    is_local_appium_url,
+    start_appium_service,
+)
+from src.utils.simulator_control import boot_simulator, find_simulator, open_simulator_app
+from src.utils.wda_setup import ensure_prebuilt_wda
 
 
 class SystemApps(Enum):
@@ -41,23 +50,28 @@ class IOSDriverConfig:
     """Configuration for iOS driver."""
 
     platform_name: str = "iOS"
-    platform_version: str = "17.0"
-    device_name: str = "iPhone 15"
+    platform_version: str = "26.4"
+    device_name: str = "iPhone 17 Pro"
     automation_name: str = "XCUITest"
     appium_server_url: str = "http://localhost:4723"
-    no_reset: bool = True
+    no_reset: bool = False
     new_command_timeout: int = 300
     wda_launch_timeout: int = 120000
     wda_connection_timeout: int = 240000
+    auto_boot_simulator: bool = True
+    open_simulator_app: bool = True
+    auto_start_appium: bool = True
+    prebuild_wda_for_simulator: bool = False
+    appium_log_path: str = "artifacts/appium.log"
+    derived_data_path: str | None = "artifacts/wda-derived-data"
 
     # Physical device settings
-    udid: Optional[str] = None  # Device UDID (required for physical devices)
-    xcode_org_id: Optional[str] = None  # Apple Team ID for signing
+    udid: str | None = None  # Device UDID (required for physical devices)
+    xcode_org_id: str | None = None  # Apple Team ID for signing
     xcode_signing_id: str = "iPhone Developer"  # Signing identity
 
     # Optional: Use pre-built WebDriverAgent (speeds up test start)
     use_prebuilt_wda: bool = False
-    derived_data_path: Optional[str] = None  # Path to WDA derived data
 
 
 class IOSDriver:
@@ -70,9 +84,9 @@ class IOSDriver:
 
     def __init__(
         self,
-        config: Optional[IOSDriverConfig] = None,
-        bundle_id: Optional[str] = None,
-        app: Optional[SystemApps] = None,
+        config: IOSDriverConfig | None = None,
+        bundle_id: str | None = None,
+        app: SystemApps | None = None,
     ):
         """
         Initialize iOS driver.
@@ -83,7 +97,8 @@ class IOSDriver:
             app: SystemApps enum value for the app to launch.
         """
         self.config = config or IOSDriverConfig()
-        self._driver: Optional[WebDriver] = None
+        self._driver: WebDriver | None = None
+        self._managed_appium_service: ManagedAppiumService | None = None
 
         # Determine bundle ID
         if bundle_id:
@@ -134,6 +149,40 @@ class IOSDriver:
 
         return options
 
+    def _prepare_simulator(self) -> None:
+        """Boot configured simulator before starting driver."""
+        if self.config.udid or not self.config.auto_boot_simulator:
+            return
+
+        simulator = find_simulator(self.config.device_name, self.config.platform_version)
+        if simulator is None:
+            raise RuntimeError(
+                f"Simulator not found for {self.config.device_name} iOS {self.config.platform_version}."
+            )
+
+        boot_simulator(simulator.udid)
+        if self.config.open_simulator_app:
+            open_simulator_app(simulator.udid)
+        if self.config.prebuild_wda_for_simulator and self.config.derived_data_path:
+            derived_data_path = ensure_prebuilt_wda(Path(self.config.derived_data_path).resolve())
+            self.config.use_prebuilt_wda = True
+            self.config.derived_data_path = str(derived_data_path)
+        self.config.udid = simulator.udid
+
+    def _ensure_appium_server(self) -> None:
+        """Start local Appium service when configured and needed."""
+        server_url = self.config.appium_server_url
+        if is_appium_server_running(server_url):
+            return
+
+        if not self.config.auto_start_appium or not is_local_appium_url(server_url):
+            raise RuntimeError(f"Appium server not reachable at {server_url}.")
+
+        self._managed_appium_service = start_appium_service(
+            server_url=server_url,
+            log_path=Path(self.config.appium_log_path),
+        )
+
     def start(self) -> "IOSDriver":
         """
         Start the Appium driver session.
@@ -141,8 +190,10 @@ class IOSDriver:
         Returns:
             Self for method chaining.
         """
+        self._prepare_simulator()
+        self._ensure_appium_server()
         options = self._build_options()
-        self._driver = webdriver.Remote(
+        self._driver = webdriver.webdriver.WebDriver(
             command_executor=self.config.appium_server_url, options=options
         )
         return self
@@ -152,74 +203,9 @@ class IOSDriver:
         if self._driver:
             self._driver.quit()
             self._driver = None
-
-    def launch_app(self, app: SystemApps) -> None:
-        """
-        Launch a system app by its enum value.
-
-        Args:
-            app: SystemApps enum value.
-        """
-        self.driver.activate_app(app.value)
-
-    def launch_app_by_bundle_id(self, bundle_id: str) -> None:
-        """
-        Launch an app by its bundle identifier.
-
-        Args:
-            bundle_id: The app's bundle identifier.
-        """
-        self.driver.activate_app(bundle_id)
-
-    def terminate_app(self, app: SystemApps) -> bool:
-        """
-        Terminate a running app.
-
-        Args:
-            app: SystemApps enum value.
-
-        Returns:
-            True if the app was terminated, False otherwise.
-        """
-        return self.driver.terminate_app(app.value)
-
-    def is_app_installed(self, app: SystemApps) -> bool:
-        """
-        Check if an app is installed.
-
-        Args:
-            app: SystemApps enum value.
-
-        Returns:
-            True if installed, False otherwise.
-        """
-        return self.driver.is_app_installed(app.value)
-
-    def get_app_state(self, app: SystemApps) -> int:
-        """
-        Get the state of an app.
-
-        Args:
-            app: SystemApps enum value.
-
-        Returns:
-            App state code:
-            - 0: Not installed
-            - 1: Not running
-            - 2: Running in background (suspended)
-            - 3: Running in background
-            - 4: Running in foreground
-        """
-        return self.driver.query_app_state(app.value)
-
-    def background_app(self, seconds: int = -1) -> None:
-        """
-        Put the app in the background.
-
-        Args:
-            seconds: How long to background. -1 means indefinitely.
-        """
-        self.driver.background_app(seconds)
+        if self._managed_appium_service:
+            self._managed_appium_service.stop()
+            self._managed_appium_service = None
 
     def __enter__(self) -> "IOSDriver":
         """Context manager entry."""

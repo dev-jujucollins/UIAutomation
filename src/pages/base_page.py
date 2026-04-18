@@ -2,17 +2,14 @@
 Base Page Object class for iOS automation.
 """
 
-from typing import List, Optional, Tuple
-
 from appium.webdriver.common.appiumby import AppiumBy
 from appium.webdriver.webdriver import WebDriver
 from appium.webdriver.webelement import WebElement
 from selenium.common.exceptions import (
     NoSuchElementException,
     TimeoutException,
-    StaleElementReferenceException,
 )
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.wait import WebDriverWait
 
 
@@ -53,7 +50,7 @@ class BasePage:
     # -------------------------------------------------------------------------
 
     def find_element(
-        self, locator: Tuple[str, str], timeout: Optional[int] = None
+        self, locator: tuple[str, str], timeout: int | None = None
     ) -> WebElement:
         """
         Find an element with explicit wait.
@@ -69,11 +66,11 @@ class BasePage:
             TimeoutException: If element not found within timeout.
         """
         wait = self._get_wait(timeout)
-        return wait.until(EC.presence_of_element_located(locator))
+        return wait.until(expected_conditions.presence_of_element_located(locator))
 
     def find_elements(
-        self, locator: Tuple[str, str], timeout: Optional[int] = None
-    ) -> List[WebElement]:
+        self, locator: tuple[str, str], timeout: int | None = None
+    ) -> list[WebElement]:
         """
         Find multiple elements.
 
@@ -86,13 +83,13 @@ class BasePage:
         """
         try:
             wait = self._get_wait(timeout)
-            wait.until(EC.presence_of_element_located(locator))
+            wait.until(expected_conditions.presence_of_element_located(locator))
             return self.driver.find_elements(*locator)
         except TimeoutException:
             return []
 
     def find_element_by_accessibility_id(
-        self, accessibility_id: str, timeout: Optional[int] = None
+        self, accessibility_id: str, timeout: int | None = None
     ) -> WebElement:
         """
         Find element by accessibility identifier.
@@ -106,14 +103,12 @@ class BasePage:
         """
         return self.find_element((self.By.ACCESSIBILITY_ID, accessibility_id), timeout)
 
-    def find_element_by_predicate(
-        self, predicate: str, timeout: Optional[int] = None
-    ) -> WebElement:
+    def find_element_by_predicate(self, predicate: str, timeout: int | None = None) -> WebElement:
         """
         Find element using iOS predicate string.
 
         Args:
-            predicate: iOS predicate string (e.g., "label == 'Settings'").
+            predicate: iOS predicate string.
             timeout: Optional timeout override.
 
         Returns:
@@ -122,7 +117,7 @@ class BasePage:
         return self.find_element((self.By.IOS_PREDICATE, predicate), timeout)
 
     def find_element_by_class_chain(
-        self, class_chain: str, timeout: Optional[int] = None
+        self, class_chain: str, timeout: int | None = None
     ) -> WebElement:
         """
         Find element using iOS class chain.
@@ -140,7 +135,7 @@ class BasePage:
     # Element Interaction Methods
     # -------------------------------------------------------------------------
 
-    def click(self, locator: Tuple[str, str], timeout: Optional[int] = None) -> None:
+    def click(self, locator: tuple[str, str], timeout: int | None = None) -> None:
         """
         Click an element.
 
@@ -153,10 +148,10 @@ class BasePage:
 
     def send_keys(
         self,
-        locator: Tuple[str, str],
+        locator: tuple[str, str],
         text: str,
         clear_first: bool = True,
-        timeout: Optional[int] = None,
+        timeout: int | None = None,
     ) -> None:
         """
         Send keys to an element.
@@ -172,7 +167,7 @@ class BasePage:
             element.clear()
         element.send_keys(text)
 
-    def get_text(self, locator: Tuple[str, str], timeout: Optional[int] = None) -> str:
+    def get_text(self, locator: tuple[str, str], timeout: int | None = None) -> str:
         """
         Get text from an element.
 
@@ -187,8 +182,8 @@ class BasePage:
         return element.text
 
     def get_attribute(
-        self, locator: Tuple[str, str], attribute: str, timeout: Optional[int] = None
-    ) -> Optional[str]:
+        self, locator: tuple[str, str], attribute: str, timeout: int | None = None
+    ) -> str | None:
         """
         Get an attribute value from an element.
 
@@ -208,7 +203,7 @@ class BasePage:
     # -------------------------------------------------------------------------
 
     def wait_for_visible(
-        self, locator: Tuple[str, str], timeout: Optional[int] = None
+        self, locator: tuple[str, str], timeout: int | None = None
     ) -> WebElement:
         """
         Wait for element to be visible.
@@ -221,10 +216,10 @@ class BasePage:
             The visible WebElement.
         """
         wait = self._get_wait(timeout)
-        return wait.until(EC.visibility_of_element_located(locator))
+        return wait.until(expected_conditions.visibility_of_element_located(locator))
 
     def wait_for_clickable(
-        self, locator: Tuple[str, str], timeout: Optional[int] = None
+        self, locator: tuple[str, str], timeout: int | None = None
     ) -> WebElement:
         """
         Wait for element to be clickable.
@@ -237,10 +232,10 @@ class BasePage:
             The clickable WebElement.
         """
         wait = self._get_wait(timeout)
-        return wait.until(EC.element_to_be_clickable(locator))
+        return wait.until(expected_conditions.element_to_be_clickable(locator))
 
     def wait_for_invisible(
-        self, locator: Tuple[str, str], timeout: Optional[int] = None
+        self, locator: tuple[str, str], timeout: int | None = None
     ) -> bool:
         """
         Wait for element to become invisible.
@@ -253,10 +248,10 @@ class BasePage:
             True if element is invisible.
         """
         wait = self._get_wait(timeout)
-        return wait.until(EC.invisibility_of_element_located(locator))
+        return wait.until(expected_conditions.invisibility_of_element_located(locator))
 
     def wait_for_text_present(
-        self, locator: Tuple[str, str], text: str, timeout: Optional[int] = None
+        self, locator: tuple[str, str], text: str, timeout: int | None = None
     ) -> bool:
         """
         Wait for specific text to be present in an element.
@@ -270,13 +265,13 @@ class BasePage:
             True if text is present.
         """
         wait = self._get_wait(timeout)
-        return wait.until(EC.text_to_be_present_in_element(locator, text))
+        return wait.until(expected_conditions.text_to_be_present_in_element(locator, text))
 
     # -------------------------------------------------------------------------
     # State Check Methods
     # -------------------------------------------------------------------------
 
-    def is_element_present(self, locator: Tuple[str, str], timeout: int = 2) -> bool:
+    def is_element_present(self, locator: tuple[str, str], timeout: int = 2) -> bool:
         """
         Check if element is present in DOM.
 
@@ -293,7 +288,7 @@ class BasePage:
         except (TimeoutException, NoSuchElementException):
             return False
 
-    def is_element_visible(self, locator: Tuple[str, str], timeout: int = 2) -> bool:
+    def is_element_visible(self, locator: tuple[str, str], timeout: int = 2) -> bool:
         """
         Check if element is visible.
 
@@ -310,7 +305,7 @@ class BasePage:
         except (TimeoutException, NoSuchElementException):
             return False
 
-    def is_element_enabled(self, locator: Tuple[str, str]) -> bool:
+    def is_element_enabled(self, locator: tuple[str, str]) -> bool:
         """
         Check if element is enabled.
 
@@ -339,8 +334,8 @@ class BasePage:
         self.driver.execute_script("mobile: scroll", {"direction": "up"})
 
     def scroll_to_element(
-        self, locator: Tuple[str, str], max_scrolls: int = 5, direction: str = "down"
-    ) -> Optional[WebElement]:
+        self, locator: tuple[str, str], max_scrolls: int = 5, direction: str = "down"
+    ) -> WebElement | None:
         """
         Scroll until element is found.
 
@@ -427,7 +422,7 @@ class BasePage:
         """
         try:
             wait = self._get_wait(timeout)
-            wait.until(EC.alert_is_present())
+            wait.until(expected_conditions.alert_is_present())
             self.driver.switch_to.alert.accept()
             return True
         except TimeoutException:
@@ -445,13 +440,13 @@ class BasePage:
         """
         try:
             wait = self._get_wait(timeout)
-            wait.until(EC.alert_is_present())
+            wait.until(expected_conditions.alert_is_present())
             self.driver.switch_to.alert.dismiss()
             return True
         except TimeoutException:
             return False
 
-    def get_alert_text(self, timeout: int = 5) -> Optional[str]:
+    def get_alert_text(self, timeout: int = 5) -> str | None:
         """
         Get alert text if present.
 
@@ -463,7 +458,7 @@ class BasePage:
         """
         try:
             wait = self._get_wait(timeout)
-            wait.until(EC.alert_is_present())
+            wait.until(expected_conditions.alert_is_present())
             return self.driver.switch_to.alert.text
         except TimeoutException:
             return None
@@ -489,7 +484,7 @@ class BasePage:
     # Helper Methods
     # -------------------------------------------------------------------------
 
-    def _get_wait(self, timeout: Optional[int]) -> WebDriverWait:
+    def _get_wait(self, timeout: int | None) -> WebDriverWait:
         """
         Get a WebDriverWait instance.
 

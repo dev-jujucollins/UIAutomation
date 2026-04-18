@@ -2,7 +2,6 @@
 Settings App - General Settings Page Object
 """
 
-from typing import Optional
 
 from appium.webdriver.webdriver import WebDriver
 
@@ -290,7 +289,7 @@ class AboutPage(BasePage):
         """
         return self.is_element_visible(self.NAME_CELL)
 
-    def _extract_value_from_label(self, label: Optional[str]) -> Optional[str]:
+    def _extract_value_from_label(self, label: str | None) -> str | None:
         """
         Extract the value part from an iOS 26.3 label.
 
@@ -308,7 +307,7 @@ class AboutPage(BasePage):
                 return parts[1].strip()
         return label
 
-    def get_device_name(self) -> Optional[str]:
+    def get_device_name(self) -> str | None:
         """
         Get the device name.
 
@@ -320,7 +319,7 @@ class AboutPage(BasePage):
         label = element.get_attribute("label")
         return self._extract_value_from_label(label)
 
-    def get_ios_version(self) -> Optional[str]:
+    def get_ios_version(self) -> str | None:
         """
         Get the iOS version.
 
@@ -338,7 +337,7 @@ class AboutPage(BasePage):
             return self._extract_value_from_label(label)
         return None
 
-    def get_model_name(self) -> Optional[str]:
+    def get_model_name(self) -> str | None:
         """
         Get the device model name.
 
@@ -352,7 +351,7 @@ class AboutPage(BasePage):
             return self._extract_value_from_label(label)
         return None
 
-    def get_model_number(self) -> Optional[str]:
+    def get_model_number(self) -> str | None:
         """
         Get the device model number.
 
@@ -366,7 +365,7 @@ class AboutPage(BasePage):
             return self._extract_value_from_label(label)
         return None
 
-    def get_serial_number(self) -> Optional[str]:
+    def get_serial_number(self) -> str | None:
         """
         Get the device serial number.
 
@@ -380,7 +379,7 @@ class AboutPage(BasePage):
             return self._extract_value_from_label(label)
         return None
 
-    def get_wifi_address(self) -> Optional[str]:
+    def get_wifi_address(self) -> str | None:
         """
         Get the Wi-Fi MAC address.
 
@@ -394,7 +393,7 @@ class AboutPage(BasePage):
             return self._extract_value_from_label(label)
         return None
 
-    def get_storage_capacity(self) -> Optional[str]:
+    def get_storage_capacity(self) -> str | None:
         """
         Get the total storage capacity.
 
@@ -408,7 +407,7 @@ class AboutPage(BasePage):
             return self._extract_value_from_label(label)
         return None
 
-    def get_available_storage(self) -> Optional[str]:
+    def get_available_storage(self) -> str | None:
         """
         Get the available storage space.
 

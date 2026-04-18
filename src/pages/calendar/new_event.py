@@ -1,8 +1,13 @@
 """New Event Page object for iOS Calendar app automation."""
 
-from typing import Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from ..base_page import BasePage
+
+if TYPE_CHECKING:
+    from .calendar_home import CalendarHomePage
 
 
 class NewEventPage(BasePage):
@@ -67,7 +72,7 @@ class NewEventPage(BasePage):
         """
         self.send_keys(self.TITLE_FIELD, title, clear_first=True)
 
-    def get_title(self) -> Optional[str]:
+    def get_title(self) -> str | None:
         """
         Get the current event title.
 
@@ -132,7 +137,7 @@ class NewEventPage(BasePage):
         self.scroll_down()
         self.click(self.CALENDAR_CELL)
 
-    def get_selected_calendar(self) -> Optional[str]:
+    def get_selected_calendar(self) -> str | None:
         """
         Get the currently selected calendar name.
 
@@ -165,7 +170,7 @@ class NewEventPage(BasePage):
             return value == "1"
         return False
 
-    def tap_cancel(self) -> "CalendarHomePage":
+    def tap_cancel(self) -> CalendarHomePage:
         """
         Cancel event creation and return to calendar home.
 
@@ -177,7 +182,7 @@ class NewEventPage(BasePage):
         self.click(self.CANCEL_BUTTON)
         return CalendarHomePage(self.driver)
 
-    def tap_done(self) -> "CalendarHomePage":
+    def tap_done(self) -> CalendarHomePage:
         """
         Save the event and return to calendar home.
 
@@ -201,7 +206,7 @@ class NewEventPage(BasePage):
             return element.is_enabled()
         return False
 
-    def create_simple_event(self, title: str) -> "CalendarHomePage":
+    def create_simple_event(self, title: str) -> CalendarHomePage:
         """
         Create a simple event with just a title.
 

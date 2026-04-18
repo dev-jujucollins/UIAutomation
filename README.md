@@ -111,12 +111,18 @@ UIAutomation/
 
 ## Running Tests
 
-### Start Appium Server
+### Zero-Setup Smoke Run
 
 ```bash
-# Start Appium in a separate terminal
-appium
+uv run pytest tests/test_settings.py::TestSettingsNavigation::test_settings_app_launches
 ```
+
+Framework now does local setup automatically for simulator runs:
+
+- boots preferred simulator if target simulator is shut down
+- opens Simulator app on target device
+- starts local Appium server if `http://localhost:4723` is not running
+- writes Appium logs to `artifacts/appium.log`
 
 ### Run All Tests
 
@@ -150,7 +156,7 @@ uv run pytest -m slow
 ### Run with Custom Device
 
 ```bash
-uv run pytest --device-name "iPhone 15 Pro" --platform-version "17.2"
+uv run pytest --device-name "iPhone 17 Pro" --platform-version "26.4.1"
 ```
 
 ### Run with HTML Report
@@ -169,11 +175,19 @@ uv run pytest -n 2  # Run with 2 parallel workers
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--device-name` | iPhone 15 | iOS device/simulator name |
-| `--platform-version` | 17.0 | iOS version |
+| `--device-name` | Best local simulator | iOS device/simulator name |
+| `--platform-version` | Best local simulator runtime | iOS version |
 | `--appium-server` | http://localhost:4723 | Appium server URL |
 | `--udid` | None | Device UDID (required for physical devices) |
 | `--team-id` | None | Apple Developer Team ID (required for physical devices) |
+
+Preferred simulator order for local runs:
+
+1. `iPhone 17 Pro` on `iOS 26.4.1`
+2. `iPhone 16 Pro` on `iOS 18.5`
+3. `iPhone 17 Pro` on `iOS 26.2`
+4. `iPhone 17 Pro` on `iOS 26.0`
+5. `iPhone 15` on `iOS 17.0`
 
 ## Physical Device Testing
 

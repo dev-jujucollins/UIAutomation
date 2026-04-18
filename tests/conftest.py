@@ -2,8 +2,8 @@
 Pytest fixtures for iOS UI Automation tests.
 """
 
-import os
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 
@@ -11,10 +11,14 @@ from src.drivers.ios_driver import IOSDriver, IOSDriverConfig, SystemApps
 from src.pages.calendar import CalendarHomePage, CalendarOnboardingPage
 from src.pages.settings import SettingsHomePage
 from src.utils.app_launcher import AppLauncher
+from src.utils.simulator_control import get_preferred_simulator
 
 # -------------------------------------------------------------------------
 # Configuration
 # -------------------------------------------------------------------------
+
+
+PREFERRED_SIMULATOR = get_preferred_simulator()
 
 
 def pytest_addoption(parser):
@@ -22,20 +26,26 @@ def pytest_addoption(parser):
     parser.addoption(
         "--device-name",
         action="store",
-        default="iPhone 15",
-        help="iOS device name (default: iPhone 15)",
+        default=PREFERRED_SIMULATOR.name,
+        help=f"iOS device name (default: {PREFERRED_SIMULATOR.name})",
     )
     parser.addoption(
         "--platform-version",
         action="store",
-        default="17.0",
-        help="iOS platform version (default: 17.0)",
+        default=PREFERRED_SIMULATOR.platform_version,
+        help=f"iOS platform version (default: {PREFERRED_SIMULATOR.platform_version})",
     )
     parser.addoption(
         "--appium-server",
         action="store",
         default="http://localhost:4723",
         help="Appium server URL (default: http://localhost:4723)",
+    )
+    parser.addoption(
+        "--no-reset",
+        action="store_true",
+        default=False,
+        help="Preserve app/device state between driver sessions",
     )
     # Physical device options
     parser.addoption(
@@ -67,6 +77,7 @@ def driver_config(request) -> IOSDriverConfig:
         device_name=request.config.getoption("--device-name"),
         platform_version=request.config.getoption("--platform-version"),
         appium_server_url=request.config.getoption("--appium-server"),
+        no_reset=request.config.getoption("--no-reset"),
         udid=udid,
         xcode_org_id=team_id,
     )
@@ -115,6 +126,17 @@ def driver(ios_driver: IOSDriver):
     return ios_driver.driver
 
 
+@pytest.fixture(scope="session")
+def is_simulator(request) -> bool:
+    """
+    Return whether current test target is an iOS simulator.
+
+    Returns:
+        True for simulator runs, False for physical devices.
+    """
+    return request.config.getoption("--udid") is None
+
+
 @pytest.fixture(scope="function")
 def app_launcher(driver) -> AppLauncher:
     """
@@ -139,7 +161,7 @@ def settings_app(driver, app_launcher: AppLauncher) -> Generator[SettingsHomePag
     Yields:
         SettingsHomePage instance.
     """
-    app_launcher.launch_settings()
+    app_launcher.launch(SystemApps.SETTINGS)
     settings_home = SettingsHomePage(driver)
 
     # Wait for Settings to be ready
@@ -149,58 +171,6 @@ def settings_app(driver, app_launcher: AppLauncher) -> Generator[SettingsHomePag
 
     # Clean up - terminate Settings app after test
     app_launcher.terminate(SystemApps.SETTINGS)
-
-
-@pytest.fixture(scope="function")
-def safari_app(driver, app_launcher: AppLauncher) -> Generator:
-    """
-    Launch Safari and provide driver.
-
-    Yields:
-        WebDriver instance with Safari in foreground.
-    """
-    app_launcher.launch_safari()
-
-    yield driver
-
-    app_launcher.terminate(SystemApps.SAFARI)
-
-
-@pytest.fixture(scope="function")
-def contacts_app(driver, app_launcher: AppLauncher) -> Generator:
-    """
-    Launch Contacts and provide driver.
-
-    Yields:
-        WebDriver instance with Contacts in foreground.
-    """
-    app_launcher.launch_contacts()
-
-    yield driver
-
-    app_launcher.terminate(SystemApps.CONTACTS)
-
-
-@pytest.fixture(scope="function")
-def calendar_app(driver, app_launcher: AppLauncher) -> Generator:
-    """
-    Launch Calendar and provide driver.
-
-    Handles first-time onboarding screens automatically by dismissing
-    location permissions and any other intro screens.
-
-    Yields:
-        WebDriver instance with Calendar in foreground.
-    """
-    app_launcher.launch_calendar()
-
-    # Handle onboarding screens (location permission, etc.)
-    onboarding = CalendarOnboardingPage(driver)
-    onboarding.dismiss_all_onboarding()
-
-    yield driver
-
-    app_launcher.terminate(SystemApps.CALENDAR)
 
 
 @pytest.fixture(scope="function")
@@ -214,33 +184,19 @@ def calendar_home(driver, app_launcher: AppLauncher) -> Generator[CalendarHomePa
     Yields:
         CalendarHomePage instance.
     """
-    app_launcher.launch_calendar()
+    app_launcher.launch(SystemApps.CALENDAR)
 
     # Handle onboarding screens (location permission, notifications, etc.)
     onboarding = CalendarOnboardingPage(driver)
-    onboarding.dismiss_all_onboarding()
+    assert onboarding.dismiss_all_onboarding(), "Failed to dismiss Calendar onboarding"
 
     calendar_page = CalendarHomePage(driver)
+    assert calendar_page.is_on_calendar_home(), "Failed to reach Calendar home"
 
     yield calendar_page
 
     # Clean up - terminate Calendar app after test
     app_launcher.terminate(SystemApps.CALENDAR)
-
-
-@pytest.fixture(scope="function")
-def photos_app(driver, app_launcher: AppLauncher) -> Generator:
-    """
-    Launch Photos and provide driver.
-
-    Yields:
-        WebDriver instance with Photos in foreground.
-    """
-    app_launcher.launch_photos()
-
-    yield driver
-
-    app_launcher.terminate(SystemApps.PHOTOS)
 
 
 # -------------------------------------------------------------------------
@@ -256,9 +212,9 @@ def screenshots_dir() -> str:
     Returns:
         Path to screenshots directory.
     """
-    screenshots_path = os.path.join(os.path.dirname(__file__), "..", "screenshots")
-    os.makedirs(screenshots_path, exist_ok=True)
-    return screenshots_path
+    screenshots_path = Path(__file__).resolve().parent.parent / "screenshots"
+    screenshots_path.mkdir(exist_ok=True)
+    return str(screenshots_path)
 
 
 @pytest.fixture(autouse=True)
@@ -295,7 +251,7 @@ def pytest_runtest_makereport(item, call):
 
         if driver and screenshots_dir:
             screenshot_name = f"{item.name}_failure.png"
-            screenshot_path = os.path.join(screenshots_dir, screenshot_name)
+            screenshot_path = str(Path(screenshots_dir) / screenshot_name)
             try:
                 driver.save_screenshot(screenshot_path)
                 print(f"\nScreenshot saved: {screenshot_path}")

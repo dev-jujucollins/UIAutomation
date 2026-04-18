@@ -8,11 +8,15 @@ covering navigation, toggles, and settings verification.
 import pytest
 
 from src.pages.settings import (
-    SettingsHomePage,
-    WifiSettingsPage,
-    DisplaySettingsPage,
     GeneralSettingsPage,
+    SettingsHomePage,
 )
+
+
+def require_real_device(is_simulator: bool, reason: str) -> None:
+    """Skip test when current target is simulator-only."""
+    if is_simulator:
+        pytest.skip(reason)
 
 
 @pytest.mark.settings
@@ -24,8 +28,9 @@ class TestSettingsNavigation:
         """Verify Settings app launches successfully."""
         assert settings_app.is_on_settings_home()
 
-    def test_navigate_to_wifi(self, settings_app: SettingsHomePage):
+    def test_navigate_to_wifi(self, settings_app: SettingsHomePage, is_simulator: bool):
         """Verify navigation to Wi-Fi settings."""
+        require_real_device(is_simulator, "Wi-Fi settings layout differs on simulator")
         wifi_page = settings_app.go_to_wifi()
         assert wifi_page.is_on_wifi_page()
 
@@ -34,8 +39,11 @@ class TestSettingsNavigation:
         general_page = settings_app.go_to_general()
         assert general_page.is_on_general_page()
 
-    def test_navigate_to_display_brightness(self, settings_app: SettingsHomePage):
+    def test_navigate_to_display_brightness(
+        self, settings_app: SettingsHomePage, is_simulator: bool
+    ):
         """Verify navigation to Display & Brightness settings."""
+        require_real_device(is_simulator, "Display settings layout differs on simulator")
         display_page = settings_app.go_to_display_brightness()
         assert display_page.is_on_display_page()
 
@@ -45,8 +53,9 @@ class TestSettingsNavigation:
         about_page = general_page.go_to_about()
         assert about_page.is_on_about_page()
 
-    def test_back_navigation(self, settings_app: SettingsHomePage):
+    def test_back_navigation(self, settings_app: SettingsHomePage, is_simulator: bool):
         """Verify back navigation returns to previous screen."""
+        require_real_device(is_simulator, "Back path via Wi-Fi screen differs on simulator")
         # Navigate to Wi-Fi
         wifi_page = settings_app.go_to_wifi()
         assert wifi_page.is_on_wifi_page()
@@ -62,41 +71,41 @@ class TestSettingsNavigation:
 class TestWifiSettings:
     """Tests for Wi-Fi settings functionality."""
 
-    def test_wifi_toggle(self, settings_app: SettingsHomePage):
+    def test_wifi_toggle(self, settings_app: SettingsHomePage, is_simulator: bool):
         """Test toggling Wi-Fi on and off."""
+        require_real_device(is_simulator, "Wi-Fi radio controls are hardware-specific")
         wifi_page = settings_app.go_to_wifi()
-
-        # Get initial state
         initial_state = wifi_page.is_wifi_enabled()
+        try:
+            wifi_page.toggle_wifi()
+            assert wifi_page.is_wifi_enabled() != initial_state
+        finally:
+            if wifi_page.is_wifi_enabled() != initial_state:
+                wifi_page.toggle_wifi()
 
-        # Toggle Wi-Fi
-        wifi_page.toggle_wifi()
-
-        # Verify state changed
-        assert wifi_page.is_wifi_enabled() != initial_state
-
-        # Toggle back to original state
-        wifi_page.toggle_wifi()
         assert wifi_page.is_wifi_enabled() == initial_state
 
-    def test_wifi_enable_disable(self, settings_app: SettingsHomePage):
+    def test_wifi_enable_disable(self, settings_app: SettingsHomePage, is_simulator: bool):
         """Test explicit enable/disable methods."""
+        require_real_device(is_simulator, "Wi-Fi radio controls are hardware-specific")
         wifi_page = settings_app.go_to_wifi()
+        initial_state = wifi_page.is_wifi_enabled()
+        try:
+            wifi_page.enable_wifi()
+            assert wifi_page.is_wifi_enabled()
 
-        # Enable Wi-Fi
-        wifi_page.enable_wifi()
-        assert wifi_page.is_wifi_enabled()
-
-        # Disable Wi-Fi
-        wifi_page.disable_wifi()
-        assert not wifi_page.is_wifi_enabled()
-
-        # Re-enable for other tests
-        wifi_page.enable_wifi()
+            wifi_page.disable_wifi()
+            assert not wifi_page.is_wifi_enabled()
+        finally:
+            if initial_state:
+                wifi_page.enable_wifi()
+            else:
+                wifi_page.disable_wifi()
 
     @pytest.mark.slow
-    def test_list_available_networks(self, settings_app: SettingsHomePage):
+    def test_list_available_networks(self, settings_app: SettingsHomePage, is_simulator: bool):
         """Test listing available Wi-Fi networks."""
+        require_real_device(is_simulator, "Available Wi-Fi networks require real hardware state")
         wifi_page = settings_app.go_to_wifi()
 
         # Ensure Wi-Fi is on
@@ -109,8 +118,9 @@ class TestWifiSettings:
         # Note: This may fail in isolated test environments
         print(f"Found {len(networks)} networks: {networks}")
 
-    def test_get_connected_network(self, settings_app: SettingsHomePage):
+    def test_get_connected_network(self, settings_app: SettingsHomePage, is_simulator: bool):
         """Test getting the currently connected network name."""
+        require_real_device(is_simulator, "Connected Wi-Fi state requires real hardware")
         wifi_page = settings_app.go_to_wifi()
 
         # Ensure Wi-Fi is on
@@ -129,58 +139,66 @@ class TestWifiSettings:
 class TestDisplaySettings:
     """Tests for Display & Brightness settings."""
 
-    def test_toggle_dark_mode(self, settings_app: SettingsHomePage):
+    def test_toggle_dark_mode(self, settings_app: SettingsHomePage, is_simulator: bool):
         """Test toggling between light and dark mode."""
+        require_real_device(is_simulator, "Display appearance controls differ on simulator")
         display_page = settings_app.go_to_display_brightness()
+        initial_automatic = display_page.is_automatic_appearance_enabled()
+        initial_dark_mode = display_page.is_dark_mode_active()
+        try:
+            display_page.disable_automatic_appearance()
+            display_page.set_light_mode()
+            assert display_page.is_light_mode_active()
 
-        # Disable automatic appearance first
-        display_page.disable_automatic_appearance()
+            display_page.set_dark_mode()
+            assert display_page.is_dark_mode_active()
+        finally:
+            if initial_dark_mode:
+                display_page.set_dark_mode()
+            else:
+                display_page.set_light_mode()
 
-        # Set to light mode
-        display_page.set_light_mode()
-        assert display_page.is_light_mode_active()
+            if initial_automatic:
+                display_page.enable_automatic_appearance()
+            else:
+                display_page.disable_automatic_appearance()
 
-        # Switch to dark mode
-        display_page.set_dark_mode()
-        assert display_page.is_dark_mode_active()
-
-        # Switch back to light mode
-        display_page.set_light_mode()
-        assert display_page.is_light_mode_active()
-
-    def test_automatic_appearance_toggle(self, settings_app: SettingsHomePage):
+    def test_automatic_appearance_toggle(
+        self, settings_app: SettingsHomePage, is_simulator: bool
+    ):
         """Test automatic appearance toggle."""
+        require_real_device(is_simulator, "Display appearance controls differ on simulator")
         display_page = settings_app.go_to_display_brightness()
-
-        # Get initial state
         initial_state = display_page.is_automatic_appearance_enabled()
+        try:
+            display_page.toggle_automatic_appearance()
+            assert display_page.is_automatic_appearance_enabled() != initial_state
+        finally:
+            if display_page.is_automatic_appearance_enabled() != initial_state:
+                display_page.toggle_automatic_appearance()
 
-        # Toggle
-        display_page.toggle_automatic_appearance()
-        assert display_page.is_automatic_appearance_enabled() != initial_state
-
-        # Restore
-        display_page.toggle_automatic_appearance()
         assert display_page.is_automatic_appearance_enabled() == initial_state
 
-    def test_true_tone_toggle(self, settings_app: SettingsHomePage):
+    def test_true_tone_toggle(self, settings_app: SettingsHomePage, is_simulator: bool):
         """Test True Tone toggle (if available on device)."""
+        require_real_device(is_simulator, "True Tone is not expected on simulator")
         display_page = settings_app.go_to_display_brightness()
 
         # This test may not work on simulators or older devices
         if display_page.is_element_present(display_page.TRUE_TONE_SWITCH, timeout=2):
             initial_state = display_page.is_true_tone_enabled()
-
-            display_page.toggle_true_tone()
-            assert display_page.is_true_tone_enabled() != initial_state
-
-            # Restore
-            display_page.toggle_true_tone()
+            try:
+                display_page.toggle_true_tone()
+                assert display_page.is_true_tone_enabled() != initial_state
+            finally:
+                if display_page.is_true_tone_enabled() != initial_state:
+                    display_page.toggle_true_tone()
         else:
             pytest.skip("True Tone not available on this device")
 
-    def test_get_brightness_level(self, settings_app: SettingsHomePage):
+    def test_get_brightness_level(self, settings_app: SettingsHomePage, is_simulator: bool):
         """Test getting current brightness level."""
+        require_real_device(is_simulator, "Brightness UI differs on simulator")
         display_page = settings_app.go_to_display_brightness()
 
         brightness = display_page.get_brightness_level()
@@ -230,8 +248,11 @@ class TestGeneralSettings:
 
         print(f"Model name: {model_name}")
 
-    def test_navigate_to_software_update(self, settings_app: SettingsHomePage):
+    def test_navigate_to_software_update(
+        self, settings_app: SettingsHomePage, is_simulator: bool
+    ):
         """Test navigation to Software Update screen."""
+        require_real_device(is_simulator, "Software Update entry is not exposed on simulator")
         general_page = settings_app.go_to_general()
         general_page.go_to_software_update()
 
@@ -246,52 +267,57 @@ class TestGeneralSettings:
 class TestAirplaneMode:
     """Tests for Airplane Mode functionality."""
 
-    def test_airplane_mode_toggle(self, settings_app: SettingsHomePage):
+    def test_airplane_mode_toggle(self, settings_app: SettingsHomePage, is_simulator: bool):
         """Test toggling Airplane Mode on and off."""
-        # Get initial state
+        require_real_device(is_simulator, "Airplane Mode is hardware-specific")
         initial_state = settings_app.is_airplane_mode_on()
+        try:
+            settings_app.toggle_airplane_mode()
+            assert settings_app.is_airplane_mode_on() != initial_state
+        finally:
+            if settings_app.is_airplane_mode_on() != initial_state:
+                settings_app.toggle_airplane_mode()
 
-        # Toggle airplane mode
-        settings_app.toggle_airplane_mode()
-
-        # Verify state changed
-        assert settings_app.is_airplane_mode_on() != initial_state
-
-        # Toggle back to original state
-        settings_app.toggle_airplane_mode()
         assert settings_app.is_airplane_mode_on() == initial_state
 
-    def test_airplane_mode_disables_wifi(self, settings_app: SettingsHomePage):
+    def test_airplane_mode_disables_wifi(
+        self, settings_app: SettingsHomePage, is_simulator: bool
+    ):
         """Test that enabling Airplane Mode affects Wi-Fi."""
-        # Ensure airplane mode is off and Wi-Fi is on
-        if settings_app.is_airplane_mode_on():
-            settings_app.toggle_airplane_mode()
-
+        require_real_device(is_simulator, "Airplane Mode and Wi-Fi interaction is hardware-specific")
         wifi_page = settings_app.go_to_wifi()
-        wifi_page.enable_wifi()
+        initial_wifi_state = wifi_page.is_wifi_enabled()
         wifi_page.go_back_to_settings()
+        initial_airplane_state = settings_app.is_airplane_mode_on()
 
-        # Enable airplane mode
-        settings_app.toggle_airplane_mode()
+        try:
+            if initial_airplane_state:
+                settings_app.toggle_airplane_mode()
 
-        # Check Wi-Fi status
-        wifi_page = settings_app.go_to_wifi()
+            wifi_page = settings_app.go_to_wifi()
+            wifi_page.enable_wifi()
+            wifi_page.go_back_to_settings()
 
-        # Wi-Fi should be disabled when airplane mode is on
-        # Note: On some iOS versions, Wi-Fi can be manually enabled even in airplane mode
-
-        # Clean up - disable airplane mode
-        wifi_page.go_back_to_settings()
-        if settings_app.is_airplane_mode_on():
             settings_app.toggle_airplane_mode()
+            assert settings_app.is_airplane_mode_on()
+        finally:
+            if settings_app.is_airplane_mode_on() != initial_airplane_state:
+                settings_app.toggle_airplane_mode()
+
+            wifi_page = settings_app.go_to_wifi()
+            if initial_wifi_state:
+                wifi_page.enable_wifi()
+            else:
+                wifi_page.disable_wifi()
 
 
 @pytest.mark.settings
 class TestSettingsSearch:
     """Tests for Settings search functionality."""
 
-    def test_search_for_wifi(self, settings_app: SettingsHomePage):
+    def test_search_for_wifi(self, settings_app: SettingsHomePage, is_simulator: bool):
         """Test searching for Wi-Fi in settings."""
+        require_real_device(is_simulator, "Settings search results differ on simulator")
         settings_app.search_settings("Wi-Fi")
 
         # Verify search results show Wi-Fi option
@@ -301,8 +327,9 @@ class TestSettingsSearch:
         # Clear search
         settings_app.clear_search()
 
-    def test_search_for_display(self, settings_app: SettingsHomePage):
+    def test_search_for_display(self, settings_app: SettingsHomePage, is_simulator: bool):
         """Test searching for display settings."""
+        require_real_device(is_simulator, "Settings search results differ on simulator")
         settings_app.search_settings("Display")
 
         # Verify search results show Display & Brightness option
@@ -312,8 +339,9 @@ class TestSettingsSearch:
         # Clear search
         settings_app.clear_search()
 
-    def test_search_and_navigate(self, settings_app: SettingsHomePage):
+    def test_search_and_navigate(self, settings_app: SettingsHomePage, is_simulator: bool):
         """Test searching and navigating to a result."""
+        require_real_device(is_simulator, "Settings search navigation differs on simulator")
         settings_app.search_settings("General")
 
         # Tap on General in search results

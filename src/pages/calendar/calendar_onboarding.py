@@ -100,18 +100,14 @@ class CalendarOnboardingPage(BasePage):
 
     def dismiss_location_permission(self) -> bool:
         """
-        Dismiss location permission by tapping 'Allow Once'.
-
-        Note: We use 'Allow Once' instead of 'Don't Allow' because the
-        apostrophe character in iOS is a special unicode character that's
-        difficult to match reliably.
+        Dismiss location permission by declining access.
 
         Returns:
             True if the button was clicked, False if alert wasn't showing.
         """
         if self.is_location_permission_showing(timeout=1):
-            if self.is_element_present(self.ALLOW_ONCE_BUTTON, timeout=2):
-                self.click(self.ALLOW_ONCE_BUTTON)
+            if self.is_element_present(self.DONT_ALLOW_BUTTON, timeout=2):
+                self.click(self.DONT_ALLOW_BUTTON)
                 return True
         return False
 
@@ -145,18 +141,14 @@ class CalendarOnboardingPage(BasePage):
 
     def dismiss_notifications_permission(self) -> bool:
         """
-        Dismiss notifications permission by tapping 'Allow'.
-
-        Note: We use 'Allow' instead of 'Don't Allow' because the
-        apostrophe character in iOS is a special unicode character that's
-        difficult to match reliably.
+        Dismiss notifications permission by declining access.
 
         Returns:
             True if the button was clicked, False if alert wasn't showing.
         """
         if self.is_notifications_permission_showing(timeout=1):
-            if self.is_element_present(self.ALLOW_BUTTON, timeout=2):
-                self.click(self.ALLOW_BUTTON)
+            if self.is_element_present(self.DONT_ALLOW_BUTTON, timeout=2):
+                self.click(self.DONT_ALLOW_BUTTON)
                 return True
         return False
 
@@ -165,8 +157,8 @@ class CalendarOnboardingPage(BasePage):
         Dismiss all onboarding screens to reach the main Calendar view.
 
         This method handles all known onboarding screens including:
-        - Location permission dialog (taps 'Allow Once')
-        - Notifications permission dialog (taps 'Allow')
+        - Location permission dialog (taps 'Don't Allow')
+        - Notifications permission dialog (taps 'Don't Allow')
         - Any future welcome/intro screens
 
         Args:
@@ -186,6 +178,7 @@ class CalendarOnboardingPage(BasePage):
                 if handled_screen:
                     time.sleep(0.5)
                     continue
+                return False
 
             # Handle notifications permission
             if self.is_notifications_permission_showing(timeout=2):
@@ -193,6 +186,7 @@ class CalendarOnboardingPage(BasePage):
                 if handled_screen:
                     time.sleep(0.5)
                     continue
+                return False
 
             # Handle generic continue/next/skip buttons
             generic_buttons = [
@@ -214,7 +208,7 @@ class CalendarOnboardingPage(BasePage):
                 # No more onboarding screens found
                 return True
 
-        return True
+        return False
 
     def get_location_alert_text(self) -> str | None:
         """
@@ -226,7 +220,8 @@ class CalendarOnboardingPage(BasePage):
         if self.is_location_permission_showing():
             try:
                 element = self.find_element(self.LOCATION_ALERT_TITLE, timeout=2)
-                return element.get_attribute("label")
+                label = element.get_attribute("label")
+                return label if isinstance(label, str) else None
             except Exception:
                 return None
         return None

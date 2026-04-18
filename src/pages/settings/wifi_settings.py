@@ -2,8 +2,8 @@
 Settings App - Wi-Fi Settings Page Object
 """
 
-from typing import List, Optional
 
+from appium.webdriver.common.appiumby import AppiumBy
 from appium.webdriver.webdriver import WebDriver
 from appium.webdriver.webelement import WebElement
 
@@ -94,6 +94,7 @@ class WifiSettingsPage(BasePage):
     def toggle_wifi(self) -> None:
         """Toggle Wi-Fi on/off."""
         import time
+
         from selenium.common.exceptions import StaleElementReferenceException
 
         # iOS 26.3: The Wi-Fi page reloads after toggling, causing stale elements
@@ -129,7 +130,7 @@ class WifiSettingsPage(BasePage):
     # Network Discovery
     # -------------------------------------------------------------------------
 
-    def get_available_networks(self) -> List[str]:
+    def get_available_networks(self) -> list[str]:
         """
         Get list of available Wi-Fi network names.
 
@@ -173,7 +174,7 @@ class WifiSettingsPage(BasePage):
 
         return networks
 
-    def get_connected_network(self) -> Optional[str]:
+    def get_connected_network(self) -> str | None:
         """
         Get the name of the currently connected network.
 
@@ -183,24 +184,18 @@ class WifiSettingsPage(BasePage):
         if not self.is_wifi_enabled():
             return None
 
-        # Look for cell with Selected trait (connected indicator)
-        # iOS 26.3: Connected network cell has traits="Selected, Button"
-        try:
-            connected_cell = (
-                self.By.IOS_PREDICATE,
-                "type == 'XCUIElementTypeCell' AND label CONTAINS 'Signal strength'",
-            )
-            # Find cells that might be networks and check for Selected trait
-            cells = self.find_elements(connected_cell, timeout=3)
-            for cell in cells:
-                # The first network cell after the Wi-Fi switch is usually the connected one
-                # It has a checkmark image
-                label = cell.get_attribute("label")
-                if label and isinstance(label, str):
-                    # Format: "NetworkName, Secure network, Signal strength X of 3 bars"
-                    return label.split(",")[0].strip()
-        except Exception:
-            pass
+        network_cells = (
+            self.By.IOS_PREDICATE,
+            "type == 'XCUIElementTypeCell' AND label CONTAINS 'Signal strength'",
+        )
+        cells = self.find_elements(network_cells, timeout=3)
+        for cell in cells:
+            if not self._is_selected_network_cell(cell):
+                continue
+
+            label = cell.get_attribute("label")
+            if label and isinstance(label, str):
+                return label.split(",")[0].strip()
 
         return None
 
@@ -231,10 +226,7 @@ class WifiSettingsPage(BasePage):
         Returns:
             True if network was found and selected.
         """
-        network_cell = (
-            self.By.IOS_PREDICATE,
-            f"type == 'XCUIElementTypeCell' AND label BEGINSWITH '{network_name}'",
-        )
+        network_cell = self._network_cell_locator(network_name)
 
         # Try to find and click the network
         if self.scroll_to_element(network_cell):
@@ -242,7 +234,7 @@ class WifiSettingsPage(BasePage):
             return True
         return False
 
-    def connect_to_network(self, network_name: str, password: Optional[str] = None) -> bool:
+    def connect_to_network(self, network_name: str, password: str | None = None) -> bool:
         """
         Connect to a Wi-Fi network.
 
@@ -303,22 +295,47 @@ class WifiSettingsPage(BasePage):
         Returns:
             True if details screen opened.
         """
-        # Find the info button for the network
-        info_button = (
+        network_cell = self._network_cell_locator(network_name)
+        if self.scroll_to_element(network_cell):
+            cell = self.find_element(network_cell, timeout=2)
+            try:
+                info_button = cell.find_element(
+                    AppiumBy.IOS_PREDICATE,
+                    "type == 'XCUIElementTypeButton' AND name == 'More Info'",
+                )
+                info_button.click()
+                return True
+            except Exception:
+                return False
+        return False
+
+    def _network_cell_locator(self, network_name: str) -> tuple[str, str]:
+        """Build a locator for a specific network cell."""
+        escaped_network_name = network_name.replace("\\", "\\\\").replace("'", "\\'")
+        return (
             self.By.IOS_PREDICATE,
-            f"type == 'XCUIElementTypeButton' AND name == 'More Info' AND "
-            f"ancestor::*[type == 'XCUIElementTypeCell' AND label CONTAINS '{network_name}']",
+            f"type == 'XCUIElementTypeCell' AND label BEGINSWITH '{escaped_network_name}'",
         )
 
-        # Alternative approach - tap the (i) button directly
-        network_info = (self.By.ACCESSIBILITY_ID, "More Info")
-
-        # First select the network cell to make info button visible
-        if self.select_network(network_name):
-            if self.is_element_present(network_info, timeout=2):
-                self.click(network_info)
+    def _is_selected_network_cell(self, cell: WebElement) -> bool:
+        """Return True when the cell represents the currently selected network."""
+        for attribute in ("selected", "value"):
+            attr_value = cell.get_attribute(attribute)
+            if isinstance(attr_value, str) and attr_value.lower() in {"1", "true", "selected"}:
                 return True
-        return False
+
+        label = cell.get_attribute("label")
+        if isinstance(label, str) and "Selected" in label:
+            return True
+
+        try:
+            cell.find_element(
+                AppiumBy.IOS_PREDICATE,
+                "type == 'XCUIElementTypeImage' AND name == 'Selected'",
+            )
+            return True
+        except Exception:
+            return False
 
     def forget_current_network(self) -> bool:
         """
@@ -337,7 +354,7 @@ class WifiSettingsPage(BasePage):
             return True
         return False
 
-    def get_ip_address(self) -> Optional[str]:
+    def get_ip_address(self) -> str | None:
         """
         Get the current IP address.
         Must be on network details screen.

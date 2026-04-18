@@ -60,6 +60,7 @@ debug_output/
 # Logs
 *.log
 logs/
+artifacts/
 
 # Appium
 appium.log

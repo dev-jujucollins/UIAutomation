@@ -1,8 +1,14 @@
 """Calendar Home Page object for iOS Calendar app automation."""
 
-from typing import List, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from ..base_page import BasePage
+
+if TYPE_CHECKING:
+    from .calendars_list import CalendarsListPage
+    from .new_event import NewEventPage
 
 
 class CalendarHomePage(BasePage):
@@ -46,7 +52,7 @@ class CalendarHomePage(BasePage):
             self.DAY_VIEW_NAV_BAR
         )
 
-    def get_current_month(self) -> Optional[str]:
+    def get_current_month(self) -> str | None:
         """
         Get the currently displayed month name from the current day label.
 
@@ -91,7 +97,7 @@ class CalendarHomePage(BasePage):
         """
         self.click(self.BACK_BUTTON)
 
-    def tap_add_event(self) -> "NewEventPage":
+    def tap_add_event(self) -> NewEventPage:
         """
         Tap the Add button to create a new event.
 
@@ -103,7 +109,7 @@ class CalendarHomePage(BasePage):
         self.click(self.ADD_BUTTON)
         return NewEventPage(self.driver)
 
-    def tap_calendars(self) -> "CalendarsListPage":
+    def tap_calendars(self) -> CalendarsListPage:
         """
         Tap the Calendars button to view calendar list.
 
@@ -137,7 +143,7 @@ class CalendarHomePage(BasePage):
         date_locator = (BasePage.By.ACCESSIBILITY_ID, date_name)
         self.click(date_locator)
 
-    def get_date_event_count(self, date_name: str) -> Optional[str]:
+    def get_date_event_count(self, date_name: str) -> str | None:
         """
         Get the event count for a specific date.
 
@@ -155,7 +161,7 @@ class CalendarHomePage(BasePage):
                 return value
         return None
 
-    def get_visible_dates_with_events(self) -> List[str]:
+    def get_visible_dates_with_events(self) -> list[str]:
         """
         Get list of visible dates that have events.
 

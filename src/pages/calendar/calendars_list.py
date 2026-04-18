@@ -1,8 +1,13 @@
 """Calendars List Page object for iOS Calendar app automation."""
 
-from typing import List, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from ..base_page import BasePage
+
+if TYPE_CHECKING:
+    from .calendar_home import CalendarHomePage
 
 
 class CalendarsListPage(BasePage):
@@ -41,7 +46,7 @@ class CalendarsListPage(BasePage):
         """
         return self.is_element_visible(self.CALENDARS_TITLE)
 
-    def tap_done(self) -> "CalendarHomePage":
+    def tap_done(self) -> CalendarHomePage:
         """
         Close the Calendars list and return to calendar home.
 
@@ -67,7 +72,7 @@ class CalendarsListPage(BasePage):
 
         return CalendarHomePage(self.driver)
 
-    def get_calendar_names(self) -> List[str]:
+    def get_calendar_names(self) -> list[str]:
         """
         Get list of all calendar names.
 
@@ -90,7 +95,7 @@ class CalendarsListPage(BasePage):
 
         return calendars
 
-    def get_account_names(self) -> List[str]:
+    def get_account_names(self) -> list[str]:
         """
         Get list of calendar account names (email addresses).
 
