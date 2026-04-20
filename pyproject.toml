@@ -72,7 +72,6 @@ markers = [
     "smoke: Smoke tests (quick sanity checks)",
     "regression: Full regression tests",
     "slow: Tests that take a long time to run",
-    "debug: Debug tests for capturing page source and locator discovery",
     "onboarding: Tests for first-time app launch onboarding screens",
 ]
 log_cli = true

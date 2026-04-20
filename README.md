@@ -97,14 +97,16 @@ UIAutomation/
 │   │       └── new_event.py       # New event creation
 │   └── utils/
 │       ├── __init__.py
-│       ├── app_launcher.py        # App launching utilities
-│       ├── element_helpers.py     # Element interaction helpers
-│       └── wait_helpers.py        # Custom wait utilities
+│       └── app_launcher.py        # App launching utilities
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py                # Pytest fixtures
 │   ├── test_settings.py           # Settings app tests
-│   └── test_calendar.py           # Calendar app tests
+│   ├── test_calendar.py           # Calendar app tests
+│   └── test_locator_scripts.py    # Unit tests for debug scripts
+├── scripts/
+│   ├── conftest.py                # Reuses test fixtures
+│   └── inspect_locators.py        # Explicit locator discovery helper
 ├── pyproject.toml                 # Project config & dependencies
 └── README.md
 ```
@@ -330,13 +332,17 @@ print(page.get_page_source())
 
 # Take screenshot
 page.take_screenshot("debug_screenshot.png")
-
-# Get element attributes
-from src.utils.element_helpers import ElementHelpers
-helpers = ElementHelpers(driver)
-attrs = helpers.get_element_attributes(element)
-print(attrs)
 ```
+
+For locator discovery, run the explicit helper script:
+
+```bash
+uv run pytest scripts/inspect_locators.py -v
+uv run pytest scripts/inspect_locators.py -v -k wifi
+uv run pytest scripts/inspect_locators.py -v -k calendar
+```
+
+It writes captured XML to `debug_output/` at the project root.
 
 ## Development
 
