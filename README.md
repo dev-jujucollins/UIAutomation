@@ -14,7 +14,7 @@ This framework provides automated testing capabilities for native iOS system app
 - Xcode with Command Line Tools
 - Node.js (for Appium)
 - Python 3.10+
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+- [uv](https://docs.astral.sh/uv/)
 
 ### Install Appium
 
@@ -35,7 +35,7 @@ appium driver install xcuitest
 
 ## Installation
 
-### Using uv (Recommended)
+### Using uv
 
 [uv](https://docs.astral.sh/uv/) is an extremely fast Python package manager. Install it first if you haven't:
 
@@ -52,24 +52,7 @@ cd UIAutomation
 # Sync dependencies (creates venv automatically)
 uv sync
 
-# Or with dev dependencies
-uv sync --all-extras
-```
-
-### Using pip (Alternative)
-
-```bash
-cd UIAutomation
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install -e .
-
-# Or with dev dependencies
-pip install -e ".[dev]"
+# Development tools are included by default
 ```
 
 ## Project Structure
@@ -77,46 +60,69 @@ pip install -e ".[dev]"
 ```
 UIAutomation/
 ├── src/
-│   ├── drivers/
-│   │   ├── __init__.py
-│   │   └── ios_driver.py          # iOS driver configuration
-│   ├── pages/
-│   │   ├── __init__.py
-│   │   ├── base_page.py           # Base page object class
-│   │   ├── settings/
-│   │   │   ├── __init__.py
-│   │   │   ├── settings_home.py   # Settings home page
-│   │   │   ├── wifi_settings.py   # Wi-Fi settings page
-│   │   │   ├── display_settings.py # Display & Brightness page
-│   │   │   └── general_settings.py # General settings page
-│   │   └── calendar/
-│   │       ├── __init__.py
-│   │       ├── calendar_home.py   # Calendar main view
-│   │       ├── calendar_onboarding.py # Onboarding flow
-│   │       ├── calendars_list.py  # Calendars list view
-│   │       └── new_event.py       # New event creation
-│   └── utils/
+│   └── uiautomation/
 │       ├── __init__.py
-│       └── app_launcher.py        # App launching utilities
+│       ├── drivers/               # Appium sessions and configuration
+│       ├── pages/                 # Base page, Settings, and Calendar
+│       └── utils/                 # App lifecycle, simulator setup, artifacts
 ├── tests/
-│   ├── __init__.py
-│   ├── conftest.py                # Pytest fixtures
-│   ├── test_settings.py           # Settings app tests
-│   ├── test_calendar.py           # Calendar app tests
-│   └── test_locator_scripts.py    # Unit tests for debug scripts
+│   ├── unit/                      # Device-free framework tests
+│   └── integration/               # Settings and Calendar journeys
 ├── scripts/
-│   ├── conftest.py                # Reuses test fixtures
-│   └── inspect_locators.py        # Explicit locator discovery helper
-├── pyproject.toml                 # Project config & dependencies
+│   └── inspect_locators.py        # Locator discovery helper
+├── conftest.py                   # Shared fixtures for tests and scripts
+├── pyproject.toml                # Package config and dependencies
 └── README.md
 ```
 
 ## Running Tests
 
+Default runs execute device-free unit tests. Device tests require `--run-integration`.
+
+```bash
+uv run pytest                         # Fast unit suite; no device needed
+uv run pytest --run-integration -m smoke  # Representative simulator smoke journeys
+uv run pytest --run-integration -m journey --headless-simulator  # Navigation checks
+uv run pytest --run-integration tests/integration  # Device regression suite
+uv run pytest --run-integration --run-diagnostics -m diagnostic
+```
+
+A single driver session is reused. App fixtures terminate apps before launch and
+register cleanup before setup so failures still trigger termination. This does not
+erase app data or guarantee every system app forgets its navigation state.
+Wi-Fi mutations restore their starting state. Simulator termination and privacy
+reset use `simctl` once per session; onboarding itself remains a UI flow. A booted
+simulator is reused; use `--restart-simulator` when recovering a stuck runtime.
+Use `--headless-simulator` on hosts without a working Simulator app window.
+Tests marked `real_device(reason="...")` skip on simulators before any app or
+driver fixtures run. `journey` covers General/About, New Event/Cancel, and day/month
+navigation. Partial device names or runtime options filter the available inventory
+before ranking; mismatches list available targets.
+
+External setup commands have finite timeouts: 30 seconds for discovery, resets,
+and Appium preflight; 120 seconds for simulator boot completion; 600 seconds for
+an optional WDA prebuild. Pytest's own timeout still applies; allow a larger
+`--timeout` for first-time builds when needed.
+
+Permission-reset failures stop setup. Settings readiness polls one UI snapshot per
+attempt, requiring a visible list and two distinct home rows with no visible alert.
+Local Appium installation checks run only when starting a managed server; an
+already-running server supplies its own drivers.
+
+Every failure phase gets a unique directory under `artifacts/<run-id>/`, with
+failure metadata and, when available, screenshot, page XML, and local Appium log.
+No screenshot fixture is required. Unavailable captures are recorded in metadata.
+Use `--artifacts-dir PATH` to relocate output. External Appium servers must supply
+logs separately. Parallel execution is supported for unit tests only; `--run-integration`
+rejects `-n` before worker startup.
+
+CI runs unit tests, Ruff lint/format checks, and Pyright on Linux. Run simulator
+smoke tests locally on macOS; physical devices cover hardware-dependent behavior.
+
 ### Zero-Setup Smoke Run
 
 ```bash
-uv run pytest tests/test_settings.py::TestSettingsNavigation::test_settings_app_launches
+uv run pytest --run-integration -m smoke
 ```
 
 Framework now does local setup automatically for simulator runs:
@@ -124,9 +130,16 @@ Framework now does local setup automatically for simulator runs:
 - boots preferred simulator if target simulator is shut down
 - opens Simulator app on target device
 - starts local Appium server if `http://localhost:4723` is not running
-- writes Appium logs to `artifacts/appium.log`
+- terminates Settings/Calendar and resets simulator privacy prompts before each fresh session
+- writes Appium logs to `artifacts/<run-id>/appium.log`
 
-### Run All Tests
+To skip session-level permission resets for debugging (test fixtures still terminate apps):
+
+```bash
+uv run pytest --run-integration -m smoke --skip-simulator-state-reset --no-reset
+```
+
+### Run Default Unit Tests
 
 ```bash
 # Using uv
@@ -139,26 +152,26 @@ pytest
 ### Run Specific Test File
 
 ```bash
-uv run pytest tests/test_settings.py
+uv run pytest --run-integration tests/integration/test_settings.py
 ```
 
 ### Run Tests by Marker
 
 ```bash
 # Run smoke tests
-uv run pytest -m smoke
+uv run pytest --run-integration -m smoke
 
 # Run Settings app tests
-uv run pytest -m settings
+uv run pytest --run-integration -m settings
 
 # Run slow tests
-uv run pytest -m slow
+uv run pytest --run-integration -m slow
 ```
 
 ### Run with Custom Device
 
 ```bash
-uv run pytest --device-name "iPhone 17 Pro" --platform-version "26.4.1"
+uv run pytest --run-integration --device-name "iPhone 17 Pro" --platform-version "26.4.1"
 ```
 
 ### Run with HTML Report
@@ -170,22 +183,29 @@ uv run pytest --html=report.html --self-contained-html
 ### Run in Parallel
 
 ```bash
-uv run pytest -n 2  # Run with 2 parallel workers
+uv run pytest tests/unit -n 2  # Run with 2 parallel workers
 ```
 
 ## Configuration Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
+| `--run-integration` | false | Enable device tests (serial execution) |
+| `--run-diagnostics` | false | Include environment-dependent observations |
+| `--headless-simulator` | false | Boot without opening the Simulator window |
+| `--restart-simulator` | false | Restart runtime during state reset for recovery |
+| `--artifacts-dir` | artifacts | Root for unique run artifacts |
 | `--device-name` | Best local simulator | iOS device/simulator name |
 | `--platform-version` | Best local simulator runtime | iOS version |
 | `--appium-server` | http://localhost:4723 | Appium server URL |
+| `--no-reset` | false | Preserve Appium app/device state |
+| `--skip-simulator-state-reset` | false | Preserve simulator app launches and privacy prompts |
 | `--udid` | None | Device UDID (required for physical devices) |
 | `--team-id` | None | Apple Developer Team ID (required for physical devices) |
 
 Preferred simulator order for local runs:
 
-1. `iPhone 17 Pro` on `iOS 26.4.1`
+1. `iPhone 17 Pro` on `iOS 26.4`
 2. `iPhone 16 Pro` on `iOS 18.5`
 3. `iPhone 17 Pro` on `iOS 26.2`
 4. `iPhone 17 Pro` on `iOS 26.0`
@@ -219,7 +239,7 @@ On your device: **Settings** > **General** > **Device Management** > Trust the d
 ### 4. Run Tests on Physical Device
 
 ```bash
-uv run pytest \
+uv run pytest --run-integration \
   --device-name "Your iPhone Name" \
   --platform-version "17.2" \
   --udid "00001234-000A1234B1234001" \
@@ -243,13 +263,38 @@ uv run pytest \
 | Contacts | com.apple.MobileAddressBook | Planned |
 | Photos | com.apple.Photos | Planned |
 
+## Python Package
+
+Runtime dependencies are Appium's Python client and Selenium. Pytest, its plugins,
+Ruff, and Pyright belong to the development group, installed by `uv sync`.
+`uv sync --no-dev` installs only runtime dependencies.
+
+Runtime code lives in `src/uiautomation/`; import it as `uiautomation`, for example
+`from uiautomation.pages.settings import SettingsHomePage`. Existing consumers
+must replace `src.*` imports with `uiautomation.*`.
+
+Import utilities from their defining modules, for example
+`from uiautomation.utils.app_launcher import AppLauncher`; utility re-exports were
+removed. Use `page.find_element((page.By.ACCESSIBILITY_ID, "identifier"))` instead
+of the removed `find_element_by_*` wrappers. The unused `screenshots_dir` fixture
+was removed; automatic failure artifacts and `page.take_screenshot(path)` remain.
+
+Unit tests are grouped by component (driver, simulator, Appium service, page
+objects, artifacts, and pytest support). About navigation has one canonical
+`journey` test.
+
+Run `uv sync` after updating the checkout to refresh the editable installation.
+The wheel includes only the runtime package; tests and locator scripts remain
+checkout utilities. Build distributions with `uv build`. CI installs the package
+without editable mode to verify imports against the built wheel.
+
 ## Writing Tests
 
 ### Basic Test Example
 
 ```python
 import pytest
-from src.pages.settings import SettingsHomePage
+from uiautomation.pages.settings import SettingsHomePage
 
 @pytest.mark.settings
 def test_navigate_to_wifi(settings_app: SettingsHomePage):
@@ -261,24 +306,19 @@ def test_navigate_to_wifi(settings_app: SettingsHomePage):
 ### Using Page Objects
 
 ```python
-from src.pages.settings import SettingsHomePage, WifiSettingsPage
+from uiautomation.pages.settings import WifiSettingsPage
 
-def test_wifi_toggle(settings_app: SettingsHomePage):
-    # Navigate to Wi-Fi
-    wifi_page = settings_app.go_to_wifi()
-    
-    # Toggle Wi-Fi
-    initial_state = wifi_page.is_wifi_enabled()
-    wifi_page.toggle_wifi()
-    
-    # Verify state changed
-    assert wifi_page.is_wifi_enabled() != initial_state
+def test_wifi_toggle(restored_wifi: WifiSettingsPage):
+    # Fixture restores the starting radio state even when the assertion fails.
+    initial_state = restored_wifi.is_wifi_enabled()
+    restored_wifi.toggle_wifi()
+    assert restored_wifi.is_wifi_enabled() != initial_state
 ```
 
 ### Creating New Page Objects
 
 ```python
-from src.pages.base_page import BasePage
+from uiautomation.pages.base_page import BasePage
 
 class MyAppPage(BasePage):
     # Define locators
@@ -337,9 +377,9 @@ page.take_screenshot("debug_screenshot.png")
 For locator discovery, run the explicit helper script:
 
 ```bash
-uv run pytest scripts/inspect_locators.py -v
-uv run pytest scripts/inspect_locators.py -v -k wifi
-uv run pytest scripts/inspect_locators.py -v -k calendar
+uv run pytest --run-integration scripts/inspect_locators.py -v
+uv run pytest --run-integration scripts/inspect_locators.py -v -k wifi
+uv run pytest --run-integration scripts/inspect_locators.py -v -k calendar
 ```
 
 It writes captured XML to `debug_output/` at the project root.
@@ -349,17 +389,17 @@ It writes captured XML to `debug_output/` at the project root.
 ### Code Formatting
 
 ```bash
-# Format code with black
-uv run black src tests
+# Format code with Ruff
+uv run ruff format .
 
-# Sort imports with isort
-uv run isort src tests
+# Fix lint and import issues
+uv run ruff check --fix .
 
 # Lint with ruff
 uv run ruff check src tests
 
-# Type checking with mypy
-uv run mypy src
+# Type checking with Pyright
+uv run pyright
 ```
 
 ### Adding Dependencies

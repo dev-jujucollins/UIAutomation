@@ -20,10 +20,10 @@ import pytest
 from appium.webdriver.common.appiumby import AppiumBy
 from selenium.webdriver.common.action_chains import ActionChains
 
-from src.drivers.ios_driver import SystemApps
-from src.pages.calendar import CalendarOnboardingPage
-from src.pages.settings import SettingsHomePage
-from src.utils.app_launcher import AppLauncher
+from uiautomation.drivers.ios_driver import SystemApps
+from uiautomation.pages.calendar import CalendarOnboardingPage
+from uiautomation.pages.settings import SettingsHomePage
+from uiautomation.utils.app_launcher import AppLauncher
 
 if TYPE_CHECKING:
     from appium.webdriver.webdriver import WebDriver
