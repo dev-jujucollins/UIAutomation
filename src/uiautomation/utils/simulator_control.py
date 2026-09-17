@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
+from urllib.parse import quote
 
 PREFERRED_SIMULATORS: tuple[tuple[str, str], ...] = (
     ("iPhone 17 Pro", "26.4"),
@@ -173,9 +176,27 @@ def reset_simulator_app_state(
 
 
 def open_simulator_app(udid: str) -> None:
-    """Open Simulator app focused on target device."""
+    """Open the selected Xcode's Device Hub focused on the target simulator."""
+    developer_dir = os.environ.get("DEVELOPER_DIR")
+    if not developer_dir:
+        developer_dir = subprocess.run(
+            ["xcode-select", "-p"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        ).stdout.strip()
+    developer_path = Path(developer_dir)
+    if developer_path.suffix == ".app":
+        developer_path = developer_path / "Contents" / "Developer"
+    device_hub = developer_path.parent / "Applications" / "DeviceHub.app"
+    if not device_hub.is_dir():
+        raise RuntimeError(
+            f"Device Hub not found at {device_hub}. Select Xcode 27 or newer, "
+            "or use --headless-simulator to run without a window."
+        )
     subprocess.run(  # noqa: S603
-        ["open", "-a", "Simulator", "--args", "-CurrentDeviceUDID", udid],
+        ["open", "-a", str(device_hub), f"devices:///manage/select?id={quote(udid, safe='')}"],
         check=True,
         capture_output=True,
         text=True,

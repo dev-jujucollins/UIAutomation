@@ -86,6 +86,7 @@ class TestCalendarAddEvent:
         assert new_event_page.is_element_present(new_event_page.TITLE_FIELD)
 
         # All-day switch should be present
+        new_event_page.expand_date_time()
         assert new_event_page.is_element_present(new_event_page.ALL_DAY_SWITCH)
 
         # Cancel to return

@@ -11,7 +11,7 @@ This framework provides automated testing capabilities for native iOS system app
 ### System Requirements
 
 - macOS (required for iOS testing)
-- Xcode with Command Line Tools
+- Xcode 27 or newer with Command Line Tools and Device Hub
 - Node.js (for Appium)
 - Python 3.10+
 - [uv](https://docs.astral.sh/uv/)
@@ -28,10 +28,10 @@ appium driver install xcuitest
 
 ### iOS Simulator Setup
 
-1. Open Xcode
-2. Go to **Xcode > Preferences > Components**
-3. Download the iOS Simulator runtime you want to test on
-4. Create a simulator: **Window > Devices and Simulators > Simulators > +**
+1. Open Xcode 27 or newer
+2. Download the iOS simulator runtime in Xcode Settings
+3. Open **Xcode > Open Developer Tool > Device Hub**
+4. Create or select your simulator in Device Hub
 
 ## Installation
 
@@ -93,7 +93,10 @@ erase app data or guarantee every system app forgets its navigation state.
 Wi-Fi mutations restore their starting state. Simulator termination and privacy
 reset use `simctl` once per session; onboarding itself remains a UI flow. A booted
 simulator is reused; use `--restart-simulator` when recovering a stuck runtime.
-Use `--headless-simulator` on hosts without a working Simulator app window.
+Use `--headless-simulator` to skip opening Device Hub. By default, tests open
+Device Hub from the Xcode selected by `DEVELOPER_DIR` or `xcode-select`.
+The framework manages the window and sets Appium’s `isHeadless` capability to
+prevent Appium from trying to launch the removed Simulator.app.
 Tests marked `real_device(reason="...")` skip on simulators before any app or
 driver fixtures run. `journey` covers General/About, New Event/Cancel, and day/month
 navigation. Partial device names or runtime options filter the available inventory
@@ -128,7 +131,7 @@ uv run pytest --run-integration -m smoke
 Framework now does local setup automatically for simulator runs:
 
 - boots preferred simulator if target simulator is shut down
-- opens Simulator app on target device
+- opens Device Hub on the target simulator
 - starts local Appium server if `http://localhost:4723` is not running
 - terminates Settings/Calendar and resets simulator privacy prompts before each fresh session
 - writes Appium logs to `artifacts/<run-id>/appium.log`
@@ -192,7 +195,7 @@ uv run pytest tests/unit -n 2  # Run with 2 parallel workers
 |--------|---------|-------------|
 | `--run-integration` | false | Enable device tests (serial execution) |
 | `--run-diagnostics` | false | Include environment-dependent observations |
-| `--headless-simulator` | false | Boot without opening the Simulator window |
+| `--headless-simulator` | false | Boot without opening Device Hub |
 | `--restart-simulator` | false | Restart runtime during state reset for recovery |
 | `--artifacts-dir` | artifacts | Root for unique run artifacts |
 | `--device-name` | Best local simulator | iOS device/simulator name |

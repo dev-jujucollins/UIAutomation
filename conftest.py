@@ -40,7 +40,7 @@ def pytest_addoption(parser):
         help="Restart simulator for stuck-runtime recovery",
     )
     parser.addoption(
-        "--headless-simulator", action="store_true", help="Boot without opening the Simulator app"
+        "--headless-simulator", action="store_true", help="Boot without opening Device Hub"
     )
     parser.addoption(
         "--artifacts-dir", default="artifacts", help="Root directory for run artifacts"

@@ -5,11 +5,10 @@ Settings App - Home Page Object
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from xml.etree import ElementTree
 
 from appium.webdriver.webdriver import WebDriver
 from appium.webdriver.webelement import WebElement
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 from selenium.webdriver.support.wait import WebDriverWait
 
 from ..base_page import BasePage
@@ -158,46 +157,47 @@ class SettingsHomePage(BasePage):
         Returns:
             List of readiness failure messages. Empty means ready.
         """
+        # Full XML snapshots on iOS 27 can poison subsequent visibility results.
+        # Query live elements so readiness checks do not change navigation behavior.
         try:
-            root = ElementTree.fromstring(self.get_page_source())
-        except ElementTree.ParseError:
-            return ["page source is empty or invalid XML"]
-
-        applications = [
-            element
-            for element in root.iter("XCUIElementTypeApplication")
-            if element.get("visible") == "true"
-            and (
-                element.get("bundleId") == "com.apple.Preferences"
-                or element.get("name") == "Settings"
-            )
-        ]
-        if not applications:
-            return ["Settings application root is not visible"]
-        app = applications[0]
-        if any(element.get("visible") == "true" for element in app.iter("XCUIElementTypeAlert")):
-            return ["visible alert blocks Settings home"]
-        lists = [
-            element
-            for element in app.iter()
-            if element.tag in {"XCUIElementTypeCollectionView", "XCUIElementTypeTable"}
-            and element.get("visible") == "true"
-        ]
-        if not lists:
-            return ["Settings list is not visible"]
-        anchors = {
-            element.get("name")
-            for container in lists
-            for element in container.iter()
-            if element.get("visible") == "true"
-            and element.get("name") in self.INITIAL_SCREEN_ANCHOR_NAMES
-        }
+            applications = [
+                element
+                for element in self.driver.find_elements(*self.SETTINGS_APP)
+                if element.is_displayed()
+            ]
+            if not applications:
+                return ["Settings application root is not visible"]
+            app = applications[0]
+            if any(
+                element.is_displayed()
+                for element in app.find_elements(self.By.CLASS_NAME, "XCUIElementTypeAlert")
+            ):
+                return ["visible alert blocks Settings home"]
+            lists = [
+                element
+                for kind in ("XCUIElementTypeCollectionView", "XCUIElementTypeTable")
+                for element in app.find_elements(self.By.CLASS_NAME, kind)
+                if element.is_displayed()
+            ]
+            if not lists:
+                return ["Settings list is not visible"]
+            names = ", ".join(f"'{name}'" for name in sorted(self.INITIAL_SCREEN_ANCHOR_NAMES))
+            anchors = {
+                name
+                for container in lists
+                for element in container.find_elements(
+                    self.By.IOS_PREDICATE, f"name IN {{{names}}}"
+                )
+                if element.is_displayed() and isinstance(name := element.get_attribute("name"), str)
+            }
+        except StaleElementReferenceException:
+            return ["Settings hierarchy changed during readiness check"]
         if len(anchors) < 2:
             return ["fewer than two expected initial Settings rows are visible"]
         return []
 
     def is_home_visually_ready(self) -> bool:
-        """Check one UI snapshot for a visible, unblocked Settings home."""
+        """Check live elements for a visible, unblocked Settings home."""
         return not self.get_home_readiness_failures()
 
     def assert_home_visually_ready(self) -> None:

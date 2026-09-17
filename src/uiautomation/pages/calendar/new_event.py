@@ -17,13 +17,20 @@ class NewEventPage(BasePage):
     Provides methods to create and edit calendar events.
     """
 
-    # Locators - iOS 26.3 compatible
+    # Locators support both iOS 26.3 and the redesigned iOS 27 editor.
     # Navigation bar
-    CANCEL_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "cancel-button")
-    ADD_DONE_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "add-button")
+    CANCEL_BUTTON = (
+        BasePage.By.IOS_PREDICATE,
+        "type == 'XCUIElementTypeButton' AND (name == 'cancel-button' OR name == 'Cancel')",
+    )
+    ADD_DONE_BUTTON = (
+        BasePage.By.IOS_PREDICATE,
+        "type == 'XCUIElementTypeButton' AND (name == 'add-button' OR name == 'Done')",
+    )
     NEW_TITLE = (
         BasePage.By.IOS_PREDICATE,
-        "type == 'XCUIElementTypeStaticText' AND name == 'New'",
+        "(type == 'XCUIElementTypeStaticText' AND name == 'New') OR "
+        "(type == 'XCUIElementTypeNavigationBar' AND name == 'New Event')",
     )
 
     # Event type segmented control
@@ -38,12 +45,21 @@ class NewEventPage(BasePage):
     )
 
     # Event fields
-    TITLE_FIELD = (BasePage.By.ACCESSIBILITY_ID, "title-field")
+    TITLE_FIELD = (
+        BasePage.By.IOS_PREDICATE,
+        "(type == 'XCUIElementTypeTextField' OR type == 'XCUIElementTypeTextView') AND "
+        "(name == 'title-field' OR name == 'magic-compose-field')",
+    )
     LOCATION_FIELD = (BasePage.By.ACCESSIBILITY_ID, "location-video-call-field")
 
     # All-day switch
     ALL_DAY_SWITCH_CELL = (BasePage.By.ACCESSIBILITY_ID, "all-day-switch-cell")
-    ALL_DAY_SWITCH = (BasePage.By.ACCESSIBILITY_ID, "all-day-switch")
+    ALL_DAY_SWITCH = (
+        BasePage.By.IOS_PREDICATE,
+        "type == 'XCUIElementTypeSwitch' AND "
+        "(name == 'all-day-switch' OR name == 'all-day-switch-cell')",
+    )
+    COLLAPSED_DATE_TIME = (BasePage.By.ACCESSIBILITY_ID, "date-time-collapsed-button")
 
     # Date/time pickers
     START_DATE_CELL = (BasePage.By.ACCESSIBILITY_ID, "start-date-picker-cell")
@@ -94,15 +110,27 @@ class NewEventPage(BasePage):
         Returns:
             True if All-day is on.
         """
-        if self.is_element_present(self.ALL_DAY_SWITCH):
-            element = self.find_element(self.ALL_DAY_SWITCH)
-            value = element.get_attribute("value")
-            return value == "1"
-        return False
+        self.expand_date_time()
+        element = self.find_element(self.ALL_DAY_SWITCH)
+        return element.get_attribute("value") == "1"
+
+    def expand_date_time(self) -> None:
+        """Expose date controls in the iOS 27 editor; leave older editors unchanged."""
+        if self.is_element_visible(self.COLLAPSED_DATE_TIME, timeout=1):
+            self.click(self.COLLAPSED_DATE_TIME)
+        self.wait_for_visible(self.ALL_DAY_SWITCH)
 
     def toggle_all_day(self) -> None:
         """Toggle the All-day switch."""
-        self.click(self.ALL_DAY_SWITCH)
+        self.expand_date_time()
+        switch = self.find_element(self.ALL_DAY_SWITCH)
+        # iOS 27 exposes the whole row as a switch; tap its nested toggle.
+        toggles = [
+            element
+            for element in switch.find_elements(self.By.CLASS_NAME, "XCUIElementTypeSwitch")
+            if element.id != switch.id
+        ]
+        (toggles[0] if toggles else switch).click()
 
     def enable_all_day(self) -> None:
         """Enable All-day if not already enabled."""

@@ -1,6 +1,7 @@
 """Tests for simulator control."""
 
 import subprocess
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -12,6 +13,51 @@ from uiautomation.utils.simulator_control import (
     get_preferred_simulator,
     reset_simulator_app_state,
 )
+
+
+@pytest.mark.parametrize("selection", ["environment", "bundle", "xcode-select"])
+def test_device_hub_uses_selected_xcode(tmp_path: Path, monkeypatch, selection: str) -> None:
+    developer = tmp_path / "Selected Xcode.app" / "Contents" / "Developer"
+    hub = developer.parent / "Applications" / "DeviceHub.app"
+    hub.mkdir(parents=True)
+    monkeypatch.delenv("DEVELOPER_DIR", raising=False)
+    if selection != "xcode-select":
+        monkeypatch.setenv(
+            "DEVELOPER_DIR", str(developer.parent.parent if selection == "bundle" else developer)
+        )
+    with patch.object(simulators.subprocess, "run") as run:
+        run.return_value.stdout = f"{developer}\n"
+        simulators.open_simulator_app("device&other=value")
+    assert run.call_count == (2 if selection == "xcode-select" else 1)
+    if selection == "xcode-select":
+        assert run.call_args_list[0].args[0] == ["xcode-select", "-p"]
+    run.assert_called_with(
+        ["open", "-a", str(hub), "devices:///manage/select?id=device%26other%3Dvalue"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert all(call.kwargs["timeout"] == 30 for call in run.call_args_list)
+
+
+def test_missing_device_hub_reports_selected_path(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DEVELOPER_DIR", str(tmp_path / "Contents" / "Developer"))
+    with patch.object(simulators.subprocess, "run") as run:
+        with pytest.raises(RuntimeError, match="Device Hub not found.*Select Xcode 27"):
+            simulators.open_simulator_app("device")
+    run.assert_not_called()
+
+
+def test_device_hub_launch_failure_propagates(tmp_path: Path, monkeypatch) -> None:
+    developer = tmp_path / "Contents" / "Developer"
+    (developer.parent / "Applications" / "DeviceHub.app").mkdir(parents=True)
+    monkeypatch.setenv("DEVELOPER_DIR", str(developer))
+    with patch.object(
+        simulators.subprocess, "run", side_effect=subprocess.CalledProcessError(1, "open")
+    ):
+        with pytest.raises(subprocess.CalledProcessError):
+            simulators.open_simulator_app("device")
 
 
 def test_find_simulator_matches_exact_device_and_version() -> None:
@@ -118,7 +164,6 @@ def test_empty_inventory_is_actionable() -> None:
         (simulators.boot_simulator, ("id",), [30, 120]),
         (simulators.shutdown_simulator, ("id",), [30]),
         (simulators.reset_simulator_app_state, ("id", ("app",)), [30, 30]),
-        (simulators.open_simulator_app, ("id",), [30]),
     ],
 )
 def test_simulator_commands_have_bounded_timeouts(operation, args, timeouts) -> None:

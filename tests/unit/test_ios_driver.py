@@ -43,9 +43,24 @@ def test_ios_driver_prepares_simulator_and_local_appium() -> None:
     shutdown_simulator.assert_not_called()
     reset_simulator_state.assert_called_once_with("sim-udid")
     open_simulator_app.assert_called_once_with("sim-udid")
+    assert driver._build_options().to_capabilities()["appium:isHeadless"] is True
     service.stop.assert_not_called()
     driver.quit()
     service.stop.assert_called_once_with()
+
+
+def test_headless_simulator_skips_device_hub() -> None:
+    driver = IOSDriver(IOSDriverConfig(open_simulator_app=False))
+    simulator = SimulatorDevice("iPhone 17 Pro", "sim-udid", "26.4", "Booted", True)
+    with (
+        patch("uiautomation.drivers.ios_driver.find_simulator", return_value=simulator),
+        patch("uiautomation.drivers.ios_driver.boot_simulator"),
+        patch("uiautomation.drivers.ios_driver.reset_simulator_app_state"),
+        patch("uiautomation.drivers.ios_driver.open_simulator_app") as open_window,
+    ):
+        driver._prepare_simulator()
+    open_window.assert_not_called()
+    assert driver._build_options().to_capabilities()["appium:isHeadless"] is True
 
 
 def test_ios_driver_can_skip_simulator_state_reset() -> None:
