@@ -3,6 +3,7 @@ Pytest fixtures for iOS UI Automation tests.
 """
 
 import logging
+import subprocess
 from collections.abc import Generator
 from pathlib import Path
 from uuid import uuid4
@@ -12,6 +13,7 @@ from appium.webdriver.webdriver import WebDriver
 
 from uiautomation.drivers.ios_driver import IOSDriver, IOSDriverConfig, SystemApps
 from uiautomation.pages.calendar import CalendarHomePage, CalendarOnboardingPage
+from uiautomation.pages.maps import MapsPage
 from uiautomation.pages.messages import ComposeMessagePage, ConversationPage, MessagesHomePage
 from uiautomation.pages.settings import SettingsHomePage, WifiSettingsPage
 from uiautomation.utils.app_launcher import AppLauncher
@@ -377,3 +379,40 @@ def pytest_runtest_makereport(item, call):
             report.sections.append(("Failure artifacts", str(destination)))
         except Exception:
             logging.getLogger(__name__).exception("Unable to save failure artifacts")
+
+
+@pytest.fixture
+def maps_home(
+    request: pytest.FixtureRequest, is_simulator: bool
+) -> Generator[MapsPage, None, None]:
+    """Own Maps UI and location permission on a dedicated simulator only."""
+    if not is_simulator:
+        pytest.skip("Maps coverage requires a dedicated simulator")
+    if request.config.getoption("--device-name") != "UIAutomation Maps":
+        raise pytest.UsageError("Maps tests require --device-name 'UIAutomation Maps'")
+    driver: WebDriver = request.getfixturevalue("driver")
+    launcher: AppLauncher = request.getfixturevalue("app_launcher")
+    udid = driver.capabilities["udid"]
+
+    def reset_permission() -> None:
+        subprocess.run(
+            ["xcrun", "simctl", "privacy", udid, "reset", "location", SystemApps.MAPS.value],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+    request.addfinalizer(reset_permission)
+    request.addfinalizer(lambda: launcher.terminate(SystemApps.MAPS))
+    launcher.terminate(SystemApps.MAPS)
+    reset_permission()
+    launcher.launch(SystemApps.MAPS)
+    page = MapsPage(driver)
+    permission = getattr(request, "param", "deny")
+    if permission not in ("allow", "deny"):
+        raise ValueError("Maps permission must be allow or deny")
+    page.wait_for_visible((page.By.ACCESSIBILITY_ID, "Allow “Maps” to use your location?"))
+    page.wait_until_ready(permission)
+    request.addfinalizer(page.close_to_home)
+    yield page
