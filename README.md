@@ -1,434 +1,360 @@
 # UIAutomation
 
-iOS Native Apps UI Automation Framework using Appium and Python.
+Python/Appium framework for testing native iOS apps with XCUITest and page objects.
+Runtime code lives in `src/uiautomation/`; tests use pytest.
 
-## Overview
+## Current coverage
 
-This framework provides automated testing capabilities for native iOS system apps. It uses the Page Object Model (POM) pattern for maintainable and scalable test automation. Currently supports Settings, Calendar, and Messages draft/navigation flows.
+| App | Bundle ID | Automated coverage |
+| --- | --- | --- |
+| Settings | `com.apple.Preferences` | Home readiness, General/About, plus physical-device Wi-Fi, display, search, and radio cases |
+| Calendar | `com.apple.mobilecal` | Onboarding, day/month navigation, event draft fields/cancel, and calendar lists |
+| Messages | `com.apple.MobileSMS` | Home, compose/cancel, recipient text, plain/Unicode/multiline drafts, discard, and seeded-conversation navigation |
+| Maps | `com.apple.Maps` | Location allow/deny, search editing, landmark details, Directions entry, and driving/walking route previews |
 
-## Prerequisites
+Messages tests do not send messages. Maps tests do not start navigation; route
+previews use explicit coordinates through the native Maps URL handler. Manual
+origin editing and real GPS behavior are outside current automated coverage.
+Other apps listed in `SystemApps` have bundle identifiers, not implemented test suites.
 
-### System Requirements
+Messages and Maps flows were exercised on an English iOS 27.0 iPhone 17 Pro
+simulator. Locators and seed-data assumptions are runtime-specific; installed
+older runtimes are not a guarantee that these app flows will pass.
 
-- macOS (required for iOS testing)
-- Xcode 27 or newer with Command Line Tools and Device Hub
-- Node.js (for Appium)
-- Python 3.10+
-- [uv](https://docs.astral.sh/uv/)
+## Requirements and installation
 
-### Install Appium
+Device-free unit tests run without Xcode, Appium, or a simulator. They require
+Python 3.10+ and [uv](https://docs.astral.sh/uv/).
+
+iOS integration tests additionally require:
+
+- macOS and selected Xcode 27 or newer with Command Line Tools and Device Hub
+- An installed iOS runtime and an existing iPhone simulator, or a configured physical device
+- Node.js, Appium, and the XCUITest driver
+- Internet access for Maps search and route responses
+
+From the checkout:
 
 ```bash
-# Install Appium globally
-npm install -g appium
+uv sync
+```
 
-# Install XCUITest driver
+This creates the virtual environment and installs runtime and development dependencies.
+For local device testing, install Appium and its driver:
+
+```bash
+npm install -g appium
 appium driver install xcuitest
 ```
 
-### iOS Simulator Setup
+Install simulator runtimes in Xcode Settings. Create simulators in Device Hub or
+with `simctl`. The framework boots existing simulators; it does not create them
+or download Xcode, runtimes, Appium, or drivers.
 
-1. Open Xcode 27 or newer
-2. Download the iOS simulator runtime in Xcode Settings
-3. Open **Xcode > Open Developer Tool > Device Hub**
-4. Create or select your simulator in Device Hub
-
-## Installation
-
-### Using uv
-
-[uv](https://docs.astral.sh/uv/) is an extremely fast Python package manager. Install it first if you haven't:
+For the examples below, create these isolated simulators **once**, after installing
+iOS 27.0:
 
 ```bash
-# Install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
+xcrun simctl create "UIAutomation Maps" \
+  com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro \
+  com.apple.CoreSimulator.SimRuntime.iOS-27-0
+
+xcrun simctl create "UIAutomation Messages" \
+  com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro \
+  com.apple.CoreSimulator.SimRuntime.iOS-27-0
 ```
 
-Then set up the project:
+Do not create duplicates if these names already exist. Check inventory with
+`xcrun simctl list devices available`.
+
+## Run tests
+
+### Unit tests
+
+Default pytest runs exclude integration tests and opt-in diagnostics:
 
 ```bash
-cd UIAutomation
-
-# Sync dependencies (creates venv automatically)
-uv sync
-
-# Development tools are included by default
-```
-
-## Project Structure
-
-```
-UIAutomation/
-├── src/
-│   └── uiautomation/
-│       ├── __init__.py
-│       ├── drivers/               # Appium sessions and configuration
-│       ├── pages/                 # Base page, Settings, Calendar, and Messages
-│       └── utils/                 # App lifecycle, simulator setup, artifacts
-├── tests/
-│   ├── unit/                      # Device-free framework tests
-│   └── integration/               # Native-app navigation and draft journeys
-├── scripts/
-│   └── inspect_locators.py        # Locator discovery helper
-├── conftest.py                   # Shared fixtures for tests and scripts
-├── pyproject.toml                # Package config and dependencies
-└── README.md
-```
-
-## Running Tests
-
-Default runs execute device-free unit tests. Device tests require `--run-integration`.
-
-```bash
-uv run pytest                         # Fast unit suite; no device needed
-uv run pytest --run-integration -m smoke  # Representative simulator smoke journeys
-uv run pytest --run-integration -m journey --headless-simulator  # Navigation checks
-uv run pytest --run-integration tests/integration  # Device regression suite
-uv run pytest --run-integration --run-diagnostics -m diagnostic
-```
-
-A single driver session is reused. App fixtures terminate apps before launch and
-register cleanup before setup so failures still trigger termination. This does not
-erase app data or guarantee every system app forgets its navigation state.
-Wi-Fi mutations restore their starting state. Simulator termination and privacy
-reset use `simctl` once per session; onboarding itself remains a UI flow. A booted
-simulator is reused; use `--restart-simulator` when recovering a stuck runtime.
-Use `--headless-simulator` to skip opening Device Hub. By default, tests open
-Device Hub from the Xcode selected by `DEVELOPER_DIR` or `xcode-select`.
-The framework manages the window and sets Appium’s `isHeadless` capability to
-prevent Appium from trying to launch the removed Simulator.app.
-Tests marked `real_device(reason="...")` skip on simulators before any app or
-driver fixtures run. `journey` covers General/About, New Event/Cancel, and day/month
-navigation. Partial device names or runtime options filter the available inventory
-before ranking; mismatches list available targets.
-
-External setup commands have finite timeouts: 30 seconds for discovery, resets,
-and Appium preflight; 120 seconds for simulator boot completion; 600 seconds for
-an optional WDA prebuild. Pytest's own timeout still applies; allow a larger
-`--timeout` for first-time builds when needed.
-
-Permission-reset failures stop setup. Settings readiness checks live controls,
-requiring a visible list and two distinct home rows with no visible alert.
-Local Appium installation checks run only when starting a managed server; an
-already-running server supplies its own drivers.
-
-Every failure phase gets a unique directory under `artifacts/<run-id>/`, with
-failure metadata and, when available, screenshot, page XML, and local Appium log.
-No screenshot fixture is required. Unavailable captures are recorded in metadata.
-Use `--artifacts-dir PATH` to relocate output. External Appium servers must supply
-logs separately. Parallel execution is supported for unit tests only; `--run-integration`
-rejects `-n` before worker startup.
-
-CI runs unit tests, Ruff lint/format checks, and Pyright on Linux. Run simulator
-smoke tests locally on macOS; physical devices cover hardware-dependent behavior.
-
-### Messages drafts and navigation
-
-Messages coverage includes home readiness, compose/cancel, recipient editing,
-plain/Unicode/multiline drafts, discard/reopen, and seeded-conversation navigation.
-Use a dedicated simulator; no test sends a message.
-
-```bash
-uv run pytest --run-integration -m messages \
-  --device-name "UIAutomation Messages" --platform-version 27.0 --timeout=300
-```
-
-See [Messages testing](docs/messages-testing.md) for simulator setup, verified
-capabilities, state cleanup, and physical-device coverage boundaries.
-
-### Zero-Setup Smoke Run
-
-```bash
-uv run pytest --run-integration -m smoke
-```
-
-Framework now does local setup automatically for simulator runs:
-
-- boots preferred simulator if target simulator is shut down
-- opens Device Hub on the target simulator
-- starts local Appium server if `http://localhost:4723` is not running
-- terminates Settings/Calendar and resets simulator privacy prompts before each fresh session
-- writes Appium logs to `artifacts/<run-id>/appium.log`
-
-To skip session-level permission resets for debugging (test fixtures still terminate apps):
-
-```bash
-uv run pytest --run-integration -m smoke --skip-simulator-state-reset --no-reset
-```
-
-### Run Default Unit Tests
-
-```bash
-# Using uv
 uv run pytest
-
-# Or if venv is activated
-pytest
-```
-
-### Run Specific Test File
-
-```bash
-uv run pytest --run-integration tests/integration/test_settings.py
-```
-
-### Run Tests by Marker
-
-```bash
-# Run smoke tests
-uv run pytest --run-integration -m smoke
-
-# Run Settings app tests
-uv run pytest --run-integration -m settings
-
-# Run slow tests
-uv run pytest --run-integration -m slow
-```
-
-### Run with Custom Device
-
-```bash
-uv run pytest --run-integration --device-name "iPhone 17 Pro" --platform-version "26.4.1"
-```
-
-### Run with HTML Report
-
-```bash
+uv run pytest tests/unit -n 2
 uv run pytest --html=report.html --self-contained-html
 ```
 
-### Run in Parallel
+The HTML command above reports unit tests. Add integration selection and target
+options when generating a device-test report.
+
+### Smoke tests
+
+`@pytest.mark.smoke` identifies quick checks. `--run-integration` enables device
+execution; `-m smoke` selects those checks. The current smoke selection contains
+six cases: Settings launch, Calendar launch, Messages home, Messages compose/cancel,
+and Maps landmark search with location denied and allowed.
+
+Run the combined smoke suite on the dedicated Maps simulator:
 
 ```bash
-uv run pytest tests/unit -n 2  # Run with 2 parallel workers
+uv run pytest --run-integration -m smoke \
+  --device-name "UIAutomation Maps" --platform-version 27.0 --timeout=300
 ```
 
-## Configuration Options
+The exact `--device-name "UIAutomation Maps"` argument is required whenever Maps
+cases are selected. A plain `--run-integration -m smoke` command will select Maps
+but fail its fixture guard. All selected apps share the chosen simulator; the
+runner does not switch simulators between apps.
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--run-integration` | false | Enable device tests (serial execution) |
-| `--run-diagnostics` | false | Include environment-dependent observations |
-| `--headless-simulator` | false | Boot without opening Device Hub |
-| `--restart-simulator` | false | Restart runtime during state reset for recovery |
-| `--artifacts-dir` | artifacts | Root for unique run artifacts |
-| `--device-name` | Best local simulator | iOS device/simulator name |
-| `--platform-version` | Best local simulator runtime | iOS version |
-| `--appium-server` | http://localhost:4723 | Appium server URL |
-| `--no-reset` | false | Preserve Appium app/device state |
-| `--skip-simulator-state-reset` | false | Preserve simulator app launches and privacy prompts |
-| `--udid` | None | Device UDID (required for physical devices) |
-| `--team-id` | None | Apple Developer Team ID (required for physical devices) |
-
-Preferred simulator order for local runs:
-
-1. `iPhone 17 Pro` on `iOS 26.4`
-2. `iPhone 16 Pro` on `iOS 18.5`
-3. `iPhone 17 Pro` on `iOS 26.2`
-4. `iPhone 17 Pro` on `iOS 26.0`
-5. `iPhone 15` on `iOS 17.0`
-
-## Physical Device Testing
-
-To run tests on a physical iPhone/iPad instead of the simulator:
-
-### 1. Get Your Device UDID
+For Settings and Calendar smoke checks on an automatically selected simulator:
 
 ```bash
-# With device plugged in via USB
+uv run pytest --run-integration -m "smoke and (settings or calendar)" --timeout=300
+```
+
+For app-specific smoke checks:
+
+```bash
+uv run pytest --run-integration -m "messages and smoke" \
+  --device-name "UIAutomation Messages" --platform-version 27.0 --timeout=300
+
+uv run pytest --run-integration -m "maps and smoke" \
+  --device-name "UIAutomation Maps" --platform-version 27.0 --timeout=300
+```
+
+### App suites and navigation journeys
+
+```bash
+# All Messages draft/navigation cases
+uv run pytest --run-integration -m messages \
+  --device-name "UIAutomation Messages" --platform-version 27.0 --timeout=300
+
+# All Maps cases
+uv run pytest --run-integration -m maps \
+  --device-name "UIAutomation Maps" --platform-version 27.0 --timeout=300
+
+# Cross-app navigation journeys, without opening Device Hub
+uv run pytest --run-integration -m journey --headless-simulator \
+  --device-name "UIAutomation Maps" --platform-version 27.0 --timeout=300
+
+# Full integration selection; hardware-only cases skip on simulator
+uv run pytest --run-integration tests/integration \
+  --device-name "UIAutomation Maps" --platform-version 27.0 --timeout=300
+
+# One Settings test
+uv run pytest --run-integration \
+  tests/integration/test_settings.py::TestSettingsNavigation::test_settings_app_launches \
+  --device-name "iPhone 17 Pro" --platform-version 27.0 --timeout=300
+
+# Opt-in Calendar observations
+uv run pytest --run-integration --run-diagnostics -m diagnostic --timeout=300
+```
+
+`journey` includes Settings General/About, Calendar day/month and new-event/cancel,
+Messages discard/conversation round trips, and Maps Directions/route/repeated-search
+flows. App markers can be combined with `smoke` or `journey` using pytest expressions.
+Selecting `regression` is not a substitute for running `tests/integration`; the
+registered marker does not automatically mark every integration test.
+
+See [Messages testing](docs/messages-testing.md) for seed-data assumptions and
+[Maps testing](docs/maps-testing.md) for exact assertions and coverage boundaries.
+
+## Runtime setup, state, and artifacts
+
+One Appium driver session is reused per pytest run. Integration tests run serially;
+parallel device execution is rejected. App fixtures establish each test's starting
+state and register termination cleanup before launching the app.
+
+For simulator runs, the framework:
+
+- Finds an existing target and boots it if needed.
+- Opens Device Hub from `DEVELOPER_DIR` or the Xcode selected by `xcode-select`.
+  `--headless-simulator` skips that window. Appium always receives `isHeadless=True`
+  so it does not attempt to open the removed Simulator.app.
+- Starts local Appium if the configured local server is unavailable. An existing
+  server is reused and supplies its own installed drivers.
+- By default, terminates Settings/Calendar and resets their privacy permissions
+  once per session. This does not erase app data.
+
+Per-app cleanup has additional rules:
+
+- Settings Wi-Fi mutation fixtures restore the initial radio state.
+- Messages clears only the test-owned compose draft before cancellation; existing
+  conversation drafts are preserved.
+- Maps requires the dedicated simulator, resets location authorization before each
+  test, answers the prompt, dismisses owned cards, terminates Maps, and resets location
+  authorization on teardown. Searches can remain in Recents.
+
+`--skip-simulator-state-reset` or `--no-reset` skips the session-level Settings/Calendar
+reset. Neither disables app fixture cleanup or Maps' per-test permission resets.
+`--restart-simulator` takes effect only when session-level reset is enabled.
+
+On failure, hooks write unique directories under `artifacts/<run-id>/` containing
+metadata and, when available, screenshots, page XML, and local Appium logs. Missing
+captures are recorded in metadata. External servers must supply logs separately.
+Use `--artifacts-dir PATH` to change the output root.
+
+Setup subprocesses have bounded timeouts. Pytest defaults to 120 seconds per test;
+examples use 300 seconds to allow setup. A first WebDriverAgent build may require
+`--timeout=600`.
+
+## Target selection and configuration
+
+Simulator name and runtime arguments are exact filters; either may be omitted.
+Among matching available iPhones, preference order is:
+
+1. iPhone 17 Pro / iOS 26.4
+2. iPhone 16 Pro / iOS 18.5
+3. iPhone 17 Pro / iOS 26.2
+4. iPhone 17 Pro / iOS 26.0
+5. iPhone 15 / iOS 17.0
+
+If none matches that preference list, the highest available runtime wins, with
+name as the tie-breaker. Explicit target mismatches list available choices.
+Maps still requires its explicit dedicated name, regardless of automatic selection.
+
+| Option | Default | Behavior |
+| --- | --- | --- |
+| `--run-integration` | off | Enable device tests |
+| `--run-diagnostics` | off | Include diagnostic cases; device cases still need `--run-integration` |
+| `--device-name` | auto | Exact simulator name; physical-device name when `--udid` is supplied |
+| `--platform-version` | auto | Exact simulator runtime; provide actual OS version for physical devices |
+| `--appium-server` | `http://localhost:4723` | Appium endpoint |
+| `--headless-simulator` | off | Skip opening Device Hub |
+| `--restart-simulator` | off | Restart simulator during session-level reset |
+| `--no-reset` | off | Enable Appium `noReset` and skip framework session-level reset |
+| `--skip-simulator-state-reset` | off | Skip framework session-level termination/privacy reset |
+| `--artifacts-dir` | `artifacts` | Root for run artifacts |
+| `--udid` | unset | Physical device identifier; omit for simulator selection |
+| `--team-id` | unset | Signing team for physical-device WebDriverAgent |
+| `--timeout` | `120` | pytest-timeout limit in seconds |
+
+## Physical devices
+
+Connect and trust the device, configure Xcode signing, and enable device development
+access as required by its OS. Find its identifier using Xcode or:
+
+```bash
 xcrun xctrace list devices
 ```
 
-Or find it in **Finder** > Select your device > Click the device info under the name.
-
-### 2. Get Your Apple Team ID
-
-1. Open **Xcode** > **Preferences** > **Accounts**
-2. Select your Apple ID
-3. Your Team ID is shown (10-character string like `ABC123XYZ9`)
-
-Or find it at [developer.apple.com/account](https://developer.apple.com/account) > Membership.
-
-### 3. Trust Your Computer
-
-On your device: **Settings** > **General** > **Device Management** > Trust the developer certificate.
-
-### 4. Run Tests on Physical Device
+Use actual device values in place of these placeholders:
 
 ```bash
-uv run pytest --run-integration \
-  --device-name "Your iPhone Name" \
-  --platform-version "17.2" \
-  --udid "00001234-000A1234B1234001" \
-  --team-id "ABC123XYZ9"
+uv run pytest --run-integration -m "settings and smoke" \
+  --device-name "YOUR_DEVICE_NAME" --platform-version "YOUR_IOS_VERSION" \
+  --udid "YOUR_DEVICE_UDID" --team-id "YOUR_APPLE_TEAM_ID" --timeout=600
 ```
 
-### First Run Notes
+First run builds/installs WebDriverAgent and may require trusting its developer
+certificate. Tests marked `real_device` skip on simulators. Maps cases skip on
+physical devices; current Messages cases assume simulator seed data and are not
+a delivery-validation suite.
 
-- The first run will build and install **WebDriverAgent** on your device
-- You may need to manually trust the WDA app on your device:
-  **Settings** > **General** > **VPN & Device Management** > Trust the developer app
-- Subsequent runs will be faster
+## Project layout
 
-## Supported System Apps
+```text
+UIAutomation/
+├── src/uiautomation/
+│   ├── drivers/                  # Driver config, sessions, system bundle IDs
+│   ├── pages/
+│   │   ├── base_page.py
+│   │   ├── settings/
+│   │   ├── calendar/
+│   │   ├── messages/
+│   │   └── maps/
+│   └── utils/                    # App lifecycle, simulator, Appium, artifacts
+├── tests/
+│   ├── unit/                     # Device-free tests, including page contracts
+│   └── integration/              # Settings, Calendar, Messages, Maps
+├── docs/                         # Messages and Maps test setup/scope
+├── scripts/inspect_locators.py   # Explicit locator-discovery utility
+├── .github/workflows/tests.yml   # Linux unit/lint/type checks
+├── conftest.py                   # CLI options, fixtures, collection, artifacts
+├── pyproject.toml                # Dependencies, package and tool configuration
+└── uv.lock
+```
 
-| App | Bundle ID | Status |
-|-----|-----------|--------|
-| Settings | com.apple.Preferences | Implemented |
-| Calendar | com.apple.mobilecal | Implemented |
-| Safari | com.apple.mobilesafari | Planned |
-| Contacts | com.apple.MobileAddressBook | Planned |
-| Photos | com.apple.Photos | Planned |
+## Writing tests
 
-## Python Package
-
-Runtime dependencies are Appium's Python client and Selenium. Pytest, its plugins,
-Ruff, and Pyright belong to the development group, installed by `uv sync`.
-`uv sync --no-dev` installs only runtime dependencies.
-
-Runtime code lives in `src/uiautomation/`; import it as `uiautomation`, for example
-`from uiautomation.pages.settings import SettingsHomePage`. Existing consumers
-must replace `src.*` imports with `uiautomation.*`.
-
-Import utilities from their defining modules, for example
-`from uiautomation.utils.app_launcher import AppLauncher`; utility re-exports were
-removed. Use `page.find_element((page.By.ACCESSIBILITY_ID, "identifier"))` instead
-of the removed `find_element_by_*` wrappers. The unused `screenshots_dir` fixture
-was removed; automatic failure artifacts and `page.take_screenshot(path)` remain.
-
-Unit tests are grouped by component (driver, simulator, Appium service, page
-objects, artifacts, and pytest support). About navigation has one canonical
-`journey` test.
-
-Run `uv sync` after updating the checkout to refresh the editable installation.
-The wheel includes only the runtime package; tests and locator scripts remain
-checkout utilities. Build distributions with `uv build`. CI installs the package
-without editable mode to verify imports against the built wheel.
-
-## Writing Tests
-
-### Basic Test Example
+Place device tests under `tests/integration/` and device-free tests under
+`tests/unit/`. Collection assigns `integration`/`unit` markers based on those
+paths. Add app and scope markers explicitly:
 
 ```python
 import pytest
+
 from uiautomation.pages.settings import SettingsHomePage
 
+
 @pytest.mark.settings
-def test_navigate_to_wifi(settings_app: SettingsHomePage):
-    """Test navigation to Wi-Fi settings."""
-    wifi_page = settings_app.go_to_wifi()
-    assert wifi_page.is_on_wifi_page()
+@pytest.mark.smoke
+def test_settings_ready(settings_app: SettingsHomePage) -> None:
+    """Require visible, usable Settings home controls."""
+    settings_app.assert_home_visually_ready()
 ```
 
-### Using Page Objects
+Available app fixtures are `settings_app`, `calendar_home`, `messages_home`,
+`message_draft`, and `maps_home`. `driver` exposes the raw Appium driver;
+`app_launcher` controls app lifecycle. `restored_wifi` restores radio state and
+skips on simulators. Mark hardware-specific tests with
+`@pytest.mark.real_device(reason="...")` so they skip before fixture setup.
 
-```python
-from uiautomation.pages.settings import WifiSettingsPage
-
-def test_wifi_toggle(restored_wifi: WifiSettingsPage):
-    # Fixture restores the starting radio state even when the assertion fails.
-    initial_state = restored_wifi.is_wifi_enabled()
-    restored_wifi.toggle_wifi()
-    assert restored_wifi.is_wifi_enabled() != initial_state
-```
-
-### Creating New Page Objects
+Import runtime modules as `uiautomation.*`. Page objects inherit `BasePage`:
 
 ```python
 from uiautomation.pages.base_page import BasePage
 
+
 class MyAppPage(BasePage):
-    # Define locators
-    SOME_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "ButtonName")
-    SOME_FIELD = (BasePage.By.IOS_PREDICATE, "type == 'XCUIElementTypeTextField'")
-    
-    def tap_button(self):
-        self.click(self.SOME_BUTTON)
-    
-    def enter_text(self, text: str):
-        self.send_keys(self.SOME_FIELD, text)
+    SAVE_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "Save")
+
+    def save(self) -> None:
+        """Tap the app's Save control."""
+        self.click(self.SAVE_BUTTON)
 ```
 
-## Locator Strategies
+Prefer accessibility IDs, then iOS predicates/class chains; use XPath only when
+needed. Wait for meaningful live controls and verify resulting state. Register
+cleanup before mutations. Full XML is for diagnostics, not a readiness assertion.
 
-| Strategy | Use Case | Example |
-|----------|----------|---------|
-| `ACCESSIBILITY_ID` | Best for stable elements | `"Settings"` |
-| `IOS_PREDICATE` | Complex queries | `"type == 'XCUIElementTypeButton' AND name == 'Done'"` |
-| `IOS_CLASS_CHAIN` | Hierarchical queries | `"**/XCUIElementTypeTable/XCUIElementTypeCell"` |
-| `XPATH` | Fallback (slower) | `"//XCUIElementTypeButton[@name='Done']"` |
+## Debugging and development
 
-## Troubleshooting
-
-### Common Issues
-
-1. **Appium can't find simulator**
-   ```bash
-   # List available simulators
-   xcrun simctl list devices
-   ```
-
-2. **WebDriverAgent build fails**
-   ```bash
-   # Navigate to WDA directory and open in Xcode
-   cd ~/.appium/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent
-   open WebDriverAgent.xcodeproj
-   # Build the WebDriverAgentRunner scheme
-   ```
-
-3. **Element not found**
-   - Use Appium Inspector to verify locators
-   - Increase timeout values
-   - Check if element is visible/enabled
-
-### Debugging Tips
+Failure artifacts are automatic. For explicit captures:
 
 ```python
-# Print page source for debugging
 print(page.get_page_source())
-
-# Take screenshot
 page.take_screenshot("debug_screenshot.png")
 ```
 
-For locator discovery, run the explicit helper script:
+The locator helper uses pytest and writes XML under `debug_output/`:
 
 ```bash
-uv run pytest --run-integration scripts/inspect_locators.py -v
-uv run pytest --run-integration scripts/inspect_locators.py -v -k wifi
-uv run pytest --run-integration scripts/inspect_locators.py -v -k calendar
+uv run pytest --run-integration scripts/inspect_locators.py -v -k calendar --timeout=300
 ```
 
-It writes captured XML to `debug_output/` at the project root.
-
-## Development
-
-### Code Formatting
+For setup failures, inspect Appium logs, confirm the selected Xcode with
+`xcode-select -p`, and list installed simulators. Inspect live accessibility
+controls when locators change; increasing waits cannot repair an incorrect locator.
 
 ```bash
-# Format code with Ruff
 uv run ruff format .
-
-# Fix lint and import issues
-uv run ruff check --fix .
-
-# Lint with ruff
-uv run ruff check src tests
-
-# Type checking with Pyright
+uv run ruff check .
 uv run pyright
+uv run pytest
+uv build
 ```
 
-### Adding Dependencies
+CI runs on Linux for pushes and pull requests. It installs with
+`uv sync --locked --no-editable`, then runs Ruff lint/format checks, Pyright, and
+`tests/unit`. Simulator/device tests run locally on macOS.
+
+Runtime dependencies are Appium's Python client and Selenium; pytest, plugins,
+Ruff, and Pyright are development dependencies. `uv sync --no-dev` installs only
+runtime dependencies. The wheel contains `uiautomation`; tests and scripts remain
+checkout utilities. Run `uv sync` after checkout updates to refresh the editable
+installation.
 
 ```bash
-# Add a runtime dependency
 uv add <package>
-
-# Add a dev dependency
 uv add --dev <package>
 ```
 
 ## License
 
-MIT License
+Project metadata declares the MIT license.
