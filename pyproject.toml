@@ -58,6 +58,7 @@ markers = [
     "safari: Tests for Safari browser",
     "contacts: Tests for Contacts app",
     "calendar: Tests for Calendar app",
+    "messages: Tests for Messages app drafts and navigation",
     "photos: Tests for Photos app",
     "smoke: Smoke tests (quick sanity checks)",
     "regression: Full regression tests",

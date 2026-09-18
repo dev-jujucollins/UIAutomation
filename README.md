@@ -4,7 +4,7 @@ iOS Native Apps UI Automation Framework using Appium and Python.
 
 ## Overview
 
-This framework provides automated testing capabilities for native iOS system apps. It uses the Page Object Model (POM) pattern for maintainable and scalable test automation. Currently supports Settings and Calendar apps, with more apps planned.
+This framework provides automated testing capabilities for native iOS system apps. It uses the Page Object Model (POM) pattern for maintainable and scalable test automation. Currently supports Settings, Calendar, and Messages draft/navigation flows.
 
 ## Prerequisites
 
@@ -63,11 +63,11 @@ UIAutomation/
 │   └── uiautomation/
 │       ├── __init__.py
 │       ├── drivers/               # Appium sessions and configuration
-│       ├── pages/                 # Base page, Settings, and Calendar
+│       ├── pages/                 # Base page, Settings, Calendar, and Messages
 │       └── utils/                 # App lifecycle, simulator setup, artifacts
 ├── tests/
 │   ├── unit/                      # Device-free framework tests
-│   └── integration/               # Settings and Calendar journeys
+│   └── integration/               # Native-app navigation and draft journeys
 ├── scripts/
 │   └── inspect_locators.py        # Locator discovery helper
 ├── conftest.py                   # Shared fixtures for tests and scripts
@@ -107,8 +107,8 @@ and Appium preflight; 120 seconds for simulator boot completion; 600 seconds for
 an optional WDA prebuild. Pytest's own timeout still applies; allow a larger
 `--timeout` for first-time builds when needed.
 
-Permission-reset failures stop setup. Settings readiness polls one UI snapshot per
-attempt, requiring a visible list and two distinct home rows with no visible alert.
+Permission-reset failures stop setup. Settings readiness checks live controls,
+requiring a visible list and two distinct home rows with no visible alert.
 Local Appium installation checks run only when starting a managed server; an
 already-running server supplies its own drivers.
 
@@ -121,6 +121,20 @@ rejects `-n` before worker startup.
 
 CI runs unit tests, Ruff lint/format checks, and Pyright on Linux. Run simulator
 smoke tests locally on macOS; physical devices cover hardware-dependent behavior.
+
+### Messages drafts and navigation
+
+Messages coverage includes home readiness, compose/cancel, recipient editing,
+plain/Unicode/multiline drafts, discard/reopen, and seeded-conversation navigation.
+Use a dedicated simulator; no test sends a message.
+
+```bash
+uv run pytest --run-integration -m messages \
+  --device-name "UIAutomation Messages" --platform-version 27.0 --timeout=300
+```
+
+See [Messages testing](docs/messages-testing.md) for simulator setup, verified
+capabilities, state cleanup, and physical-device coverage boundaries.
 
 ### Zero-Setup Smoke Run
 

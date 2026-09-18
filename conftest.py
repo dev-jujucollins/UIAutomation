@@ -12,6 +12,7 @@ from appium.webdriver.webdriver import WebDriver
 
 from uiautomation.drivers.ios_driver import IOSDriver, IOSDriverConfig, SystemApps
 from uiautomation.pages.calendar import CalendarHomePage, CalendarOnboardingPage
+from uiautomation.pages.messages import ComposeMessagePage, ConversationPage, MessagesHomePage
 from uiautomation.pages.settings import SettingsHomePage, WifiSettingsPage
 from uiautomation.utils.app_launcher import AppLauncher
 from uiautomation.utils.failure_artifacts import capture_failure
@@ -297,6 +298,32 @@ def calendar_home(
 # -------------------------------------------------------------------------
 # Utility Fixtures
 # -------------------------------------------------------------------------
+
+
+@pytest.fixture
+def messages_home(
+    request: pytest.FixtureRequest, driver: WebDriver, app_launcher: AppLauncher
+) -> Generator[MessagesHomePage, None, None]:
+    """Launch Messages and return to its list without changing existing drafts."""
+    request.addfinalizer(lambda: app_launcher.terminate(SystemApps.MESSAGES))
+    app_launcher.terminate(SystemApps.MESSAGES)
+    app_launcher.launch(SystemApps.MESSAGES)
+    conversation = ConversationPage(driver)
+    if conversation.is_element_visible(conversation.BACK_BUTTON, timeout=1):
+        conversation.go_back()
+    home = MessagesHomePage(driver)
+    home.wait_until_ready()
+    yield home
+
+
+@pytest.fixture
+def message_draft(
+    request: pytest.FixtureRequest, messages_home: MessagesHomePage
+) -> ComposeMessagePage:
+    """Register cleanup before opening a test-owned, unsent compose sheet."""
+    page = ComposeMessagePage(messages_home.driver)
+    request.addfinalizer(page.discard)
+    return messages_home.open_compose()
 
 
 @pytest.fixture
