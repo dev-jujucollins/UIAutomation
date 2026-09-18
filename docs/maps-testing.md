@@ -2,21 +2,24 @@
 
 ## Target and scope
 
-Use a dedicated **UIAutomation Maps** simulator with iOS 27.0, English UI,
-and internet access. The fixture requires that exact device name and skips
+Use an iPhone simulator with iOS 27.0, English UI, and internet access. Any
+simulator name works, including automatic target selection. The fixture skips
 physical devices before creating a driver session. Existing Appium setup opens
-Device Hub for visible runs.
+Device Hub for visible runs. An isolated simulator is optional.
 
 ```bash
+# Optional: create an isolated simulator once
 xcrun simctl create "UIAutomation Maps" \
   com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro \
   com.apple.CoreSimulator.SimRuntime.iOS-27-0
 
 uv run pytest --run-integration -m maps \
-  --device-name "UIAutomation Maps" --platform-version 27.0 --timeout=300
+  --platform-version 27.0 --timeout=300
 ```
 
-Create the simulator once. First WebDriverAgent build may take several minutes.
+The run command selects an available iOS 27.0 simulator. Add `--device-name`
+with any existing simulator name to choose one explicitly. First WebDriverAgent
+build may take several minutes.
 
 ## P0 acceptance cases
 
@@ -46,8 +49,10 @@ Known fixture destinations are expected to have both driving and walking routes.
 Before each test, terminate Maps and reset its location authorization. Require
 and answer the location prompt explicitly. On teardown, dismiss owned cards,
 terminate Maps, and reset location authorization to its unprompted state, even
-when setup or assertions fail. This is a defined baseline on a disposable
-simulator, not restoration of a personal device's permissions.
+when setup or assertions fail. This establishes an unprompted baseline on the
+selected simulator; it does not restore the simulator's previous location
+authorization. Use an isolated simulator if its existing Maps permission state
+must be preserved.
 
 Known first-run notification, advertising information, and route safety sheets
 are handled explicitly. Unknown alerts fail instead of being silently accepted.

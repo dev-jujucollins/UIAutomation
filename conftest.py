@@ -385,11 +385,9 @@ def pytest_runtest_makereport(item, call):
 def maps_home(
     request: pytest.FixtureRequest, is_simulator: bool
 ) -> Generator[MapsPage, None, None]:
-    """Own Maps UI and location permission on a dedicated simulator only."""
+    """Own Maps UI and location permission on the selected simulator."""
     if not is_simulator:
-        pytest.skip("Maps coverage requires a dedicated simulator")
-    if request.config.getoption("--device-name") != "UIAutomation Maps":
-        raise pytest.UsageError("Maps tests require --device-name 'UIAutomation Maps'")
+        pytest.skip("Maps coverage requires a simulator")
     driver: WebDriver = request.getfixturevalue("driver")
     launcher: AppLauncher = request.getfixturevalue("app_launcher")
     udid = driver.capabilities["udid"]

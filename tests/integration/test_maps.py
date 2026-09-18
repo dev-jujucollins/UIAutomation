@@ -1,4 +1,4 @@
-"""Maps P0 journeys on a dedicated simulator; navigation never starts."""
+"""Maps P0 journeys on the selected simulator; navigation never starts."""
 
 import pytest
 

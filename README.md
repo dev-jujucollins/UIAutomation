@@ -51,8 +51,8 @@ Install simulator runtimes in Xcode Settings. Create simulators in Device Hub or
 with `simctl`. The framework boots existing simulators; it does not create them
 or download Xcode, runtimes, Appium, or drivers.
 
-For the examples below, create these isolated simulators **once**, after installing
-iOS 27.0:
+Existing iPhone simulators on iOS 27.0 work with any name. For optional isolation,
+create these simulators **once**, after installing iOS 27.0:
 
 ```bash
 xcrun simctl create "UIAutomation Maps" \
@@ -89,17 +89,18 @@ execution; `-m smoke` selects those checks. The current smoke selection contains
 six cases: Settings launch, Calendar launch, Messages home, Messages compose/cancel,
 and Maps landmark search with location denied and allowed.
 
-Run the combined smoke suite on the dedicated Maps simulator:
+Run the combined smoke suite on an available iOS 27.0 simulator:
 
 ```bash
 uv run pytest --run-integration -m smoke \
-  --device-name "UIAutomation Maps" --platform-version 27.0 --timeout=300
+  --platform-version 27.0 --timeout=300
 ```
 
-The exact `--device-name "UIAutomation Maps"` argument is required whenever Maps
-cases are selected. A plain `--run-integration -m smoke` command will select Maps
-but fail its fixture guard. All selected apps share the chosen simulator; the
-runner does not switch simulators between apps.
+Simulator names are unrestricted. `--platform-version 27.0` selects the tested
+runtime; optionally add `--device-name "iPhone 17 Pro"` (or any existing simulator
+name) to select a specific device. All selected apps share that simulator.
+Omitting both options uses the framework's normal simulator preference order,
+which can select an older runtime.
 
 For Settings and Calendar smoke checks on an automatically selected simulator:
 
@@ -114,7 +115,7 @@ uv run pytest --run-integration -m "messages and smoke" \
   --device-name "UIAutomation Messages" --platform-version 27.0 --timeout=300
 
 uv run pytest --run-integration -m "maps and smoke" \
-  --device-name "UIAutomation Maps" --platform-version 27.0 --timeout=300
+  --platform-version 27.0 --timeout=300
 ```
 
 ### App suites and navigation journeys
@@ -126,15 +127,15 @@ uv run pytest --run-integration -m messages \
 
 # All Maps cases
 uv run pytest --run-integration -m maps \
-  --device-name "UIAutomation Maps" --platform-version 27.0 --timeout=300
+  --platform-version 27.0 --timeout=300
 
 # Cross-app navigation journeys, without opening Device Hub
 uv run pytest --run-integration -m journey --headless-simulator \
-  --device-name "UIAutomation Maps" --platform-version 27.0 --timeout=300
+  --platform-version 27.0 --timeout=300
 
 # Full integration selection; hardware-only cases skip on simulator
 uv run pytest --run-integration tests/integration \
-  --device-name "UIAutomation Maps" --platform-version 27.0 --timeout=300
+  --platform-version 27.0 --timeout=300
 
 # One Settings test
 uv run pytest --run-integration \
@@ -176,7 +177,7 @@ Per-app cleanup has additional rules:
 - Settings Wi-Fi mutation fixtures restore the initial radio state.
 - Messages clears only the test-owned compose draft before cancellation; existing
   conversation drafts are preserved.
-- Maps requires the dedicated simulator, resets location authorization before each
+- Maps uses the selected simulator, resets location authorization before each
   test, answers the prompt, dismisses owned cards, terminates Maps, and resets location
   authorization on teardown. Searches can remain in Recents.
 
@@ -206,7 +207,7 @@ Among matching available iPhones, preference order is:
 
 If none matches that preference list, the highest available runtime wins, with
 name as the tie-breaker. Explicit target mismatches list available choices.
-Maps still requires its explicit dedicated name, regardless of automatic selection.
+Maps accepts the same selected simulator as the other app fixtures; no special name is required.
 
 | Option | Default | Behavior |
 | --- | --- | --- |

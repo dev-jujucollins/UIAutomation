@@ -122,12 +122,31 @@ def test_cleanup_has_bounded_attempts() -> None:
     assert close.click.call_count == 6
 
 
-def test_maps_requires_dedicated_simulator_before_driver_setup() -> None:
-    request = MagicMock()
-    request.config.getoption.return_value = "Personal iPhone"
-    with pytest.raises(pytest.UsageError, match="UIAutomation Maps"):
-        next(conftest.maps_home.__wrapped__(request, True))
-    request.getfixturevalue.assert_not_called()
+@pytest.mark.parametrize("device_name", [None, "iPhone 17 Pro", "Custom Simulator"])
+def test_maps_uses_selected_simulator_regardless_of_name(device_name: str | None) -> None:
+    request, driver, launcher = MagicMock(), MagicMock(), MagicMock()
+    request.config.getoption.return_value = device_name
+    request.param = "deny"
+    request.getfixturevalue.side_effect = [driver, launcher]
+    driver.capabilities = {"udid": "selected-simulator"}
+    with patch("conftest.subprocess.run") as run, patch("conftest.MapsPage") as page_type:
+        fixture = conftest.maps_home.__wrapped__(request, True)
+        assert next(fixture) is page_type.return_value
+        page_type.assert_called_once_with(driver)
+        page_type.return_value.wait_until_ready.assert_called_once_with("deny")
+        for finalizer in reversed(request.addfinalizer.call_args_list):
+            finalizer.args[0]()
+    assert run.call_count == 2
+    for invocation in run.call_args_list:
+        assert invocation.args[0] == [
+            "xcrun",
+            "simctl",
+            "privacy",
+            "selected-simulator",
+            "reset",
+            "location",
+            "com.apple.Maps",
+        ]
 
 
 def test_maps_skips_physical_device_before_driver_setup() -> None:
@@ -139,7 +158,6 @@ def test_maps_skips_physical_device_before_driver_setup() -> None:
 
 def test_permission_cleanup_registered_before_launch_failure() -> None:
     request, driver, launcher = MagicMock(), MagicMock(), MagicMock()
-    request.config.getoption.return_value = "UIAutomation Maps"
     request.getfixturevalue.side_effect = [driver, launcher]
     driver.capabilities = {"udid": "test-simulator"}
     launcher.launch.side_effect = RuntimeError("launch failed")
