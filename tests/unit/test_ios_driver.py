@@ -11,6 +11,13 @@ from uiautomation.utils.simulator_control import (
 )
 
 
+def test_default_driver_targets_iphone_18_pro() -> None:
+    """Direct driver usage should target the preferred installed simulator."""
+    capabilities = IOSDriver(IOSDriverConfig())._build_options().to_capabilities()
+    assert capabilities["appium:deviceName"] == "iPhone 18 Pro"
+    assert capabilities["appium:platformVersion"] == "27.0"
+
+
 def test_ios_driver_prepares_simulator_and_local_appium() -> None:
     """Driver should boot simulator and start local Appium when missing."""
     config = IOSDriverConfig(

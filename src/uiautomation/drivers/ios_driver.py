@@ -58,8 +58,8 @@ class IOSDriverConfig:
     """Configuration for iOS driver."""
 
     platform_name: str = "iOS"
-    platform_version: str = "26.4"
-    device_name: str = "iPhone 17 Pro"
+    platform_version: str = "27.0"
+    device_name: str = "iPhone 18 Pro"
     automation_name: str = "XCUITest"
     appium_server_url: str = "http://localhost:4723"
     no_reset: bool = False

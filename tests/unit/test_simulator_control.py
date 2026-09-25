@@ -110,6 +110,28 @@ def test_get_preferred_simulator_uses_ranked_choice() -> None:
     assert simulator == simulators[0]
 
 
+@pytest.mark.parametrize(
+    "name, version, expected",
+    [
+        (None, None, "pro"),
+        ("iPhone Duo", None, "duo"),
+        (None, "27.1", "duo"),
+    ],
+)
+def test_iphone_18_pro_preferred_over_newer_duo(
+    name: str | None, version: str | None, expected: str
+) -> None:
+    """Default to iPhone 18 Pro while respecting explicit target overrides."""
+    devices = [
+        SimulatorDevice("iPhone Duo", "duo", "27.1", "Booted", True),
+        SimulatorDevice("iPhone 17 Pro", "old", "26.4", "Shutdown", True),
+        SimulatorDevice("iPhone 18 Pro Max", "max", "27.0", "Shutdown", True),
+        SimulatorDevice("iPhone 18 Pro", "pro", "27.0", "Shutdown", True),
+    ]
+    with patch.object(simulators, "list_available_simulators", return_value=devices):
+        assert get_preferred_simulator(name, version).udid == expected
+
+
 def test_privacy_reset_failure_is_not_silenced() -> None:
     def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         if "privacy" in command:

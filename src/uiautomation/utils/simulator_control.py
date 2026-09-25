@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 PREFERRED_SIMULATORS: tuple[tuple[str, str], ...] = (
+    ("iPhone 18 Pro", "27.0"),
     ("iPhone 17 Pro", "26.4"),
     ("iPhone 16 Pro", "18.5"),
     ("iPhone 17 Pro", "26.2"),

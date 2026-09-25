@@ -199,11 +199,12 @@ examples use 300 seconds to allow setup. A first WebDriverAgent build may requir
 Simulator name and runtime arguments are exact filters; either may be omitted.
 Among matching available iPhones, preference order is:
 
-1. iPhone 17 Pro / iOS 26.4
-2. iPhone 16 Pro / iOS 18.5
-3. iPhone 17 Pro / iOS 26.2
-4. iPhone 17 Pro / iOS 26.0
-5. iPhone 15 / iOS 17.0
+1. iPhone 18 Pro / iOS 27.0
+2. iPhone 17 Pro / iOS 26.4
+3. iPhone 16 Pro / iOS 18.5
+4. iPhone 17 Pro / iOS 26.2
+5. iPhone 17 Pro / iOS 26.0
+6. iPhone 15 / iOS 17.0
 
 If none matches that preference list, the highest available runtime wins, with
 name as the tie-breaker. Explicit target mismatches list available choices.
