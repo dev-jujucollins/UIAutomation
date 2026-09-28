@@ -2,6 +2,9 @@
 
 from unittest.mock import MagicMock
 
+import pytest
+from selenium.common.exceptions import NoSuchElementException, WebDriverException
+
 from uiautomation.pages.settings.wifi_settings import WifiSettingsPage
 
 
@@ -16,7 +19,7 @@ def test_get_connected_network_requires_selected_state() -> None:
         "value": "0",
         "label": "CoffeeShop, Secure network, Signal strength 3 of 3 bars",
     }.get(name)
-    first_cell.find_element.side_effect = Exception("not selected")
+    first_cell.find_element.side_effect = NoSuchElementException("not selected")
 
     second_cell = MagicMock()
     second_cell.get_attribute.side_effect = lambda name: {
@@ -42,3 +45,18 @@ def test_open_network_details_clicks_info_button_inside_target_cell() -> None:
 
     assert page.open_network_details("OfficeWiFi") is True
     info_button.click.assert_called_once_with()
+
+
+def test_network_selection_escapes_text_and_requires_complete_ssid() -> None:
+    locator = WifiSettingsPage(MagicMock())._network_cell_locator("Julius's\\WiFi")
+    assert "label == 'Julius\\'s\\\\WiFi'" in locator[1]
+    assert "label BEGINSWITH 'Julius\\'s\\\\WiFi, '" in locator[1]
+
+
+def test_network_details_does_not_swallow_connection_errors() -> None:
+    page = WifiSettingsPage(MagicMock())
+    page.scroll_to_element = MagicMock(return_value=MagicMock())
+    page.find_element = MagicMock()
+    page.find_element.return_value.find_element.side_effect = WebDriverException("disconnected")
+    with pytest.raises(WebDriverException, match="disconnected"):
+        page.open_network_details("Home")

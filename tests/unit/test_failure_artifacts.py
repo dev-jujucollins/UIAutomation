@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from uiautomation.utils.failure_artifacts import capture_failure
+from uiautomation.utils.failure_artifacts import artifact_links, capture_failure
 
 
 def test_failed_screenshot_does_not_hide_other_evidence(tmp_path: Path) -> None:
@@ -21,3 +21,16 @@ def test_failed_screenshot_does_not_hide_other_evidence(tmp_path: Path) -> None:
     second = capture_failure(tmp_path, "test[param/one]", "setup", None, None, "failure")
     assert output != second
     assert json.loads((second / "failure.json").read_text())["capture_errors"]
+
+
+def test_artifact_links_are_relative_and_url_encoded(tmp_path: Path) -> None:
+    """Moving an extracted CI bundle preserves links, including spaces in paths."""
+    destination = tmp_path / "artifacts" / "run one" / "failed"
+    destination.mkdir(parents=True)
+    (destination / "screen.png").touch()
+    (destination / "page.xml").touch()
+    report = tmp_path / "reports" / "report.html"
+    assert artifact_links(destination, report) == [
+        ("page.xml", "../artifacts/run%20one/failed/page.xml"),
+        ("screen.png", "../artifacts/run%20one/failed/screen.png"),
+    ]

@@ -12,6 +12,9 @@ dependencies = [
     "selenium>=4.15.0",
 ]
 
+[project.scripts]
+uiautomation = "uiautomation.cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -25,9 +28,9 @@ dev = [
     "pytest-timeout>=2.2.0",
     "pytest-html>=4.1.0",
     "pytest-xdist>=3.5.0",
-
     "ruff>=0.1.0",
     "pyright>=1.1.390",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.ruff]
@@ -51,6 +54,7 @@ python_functions = ["test_*"]
 markers = [
     "real_device(reason): Requires a physical device; skip before fixture setup",
     "journey: Representative navigation round trips",
+    "lifecycle: Tests creating and deleting owned data on an explicitly selected simulator",
     "unit: Tests requiring no device or Appium server",
     "integration: Tests requiring an iOS target",
     "diagnostic: Environment-dependent observations",
@@ -72,3 +76,10 @@ log_cli_format = "%(asctime)s [%(levelname)s] %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 addopts = "-v --tb=short --strict-markers"
 timeout = 120
+
+[tool.coverage.run]
+branch = true
+source = ["uiautomation"]
+
+[tool.coverage.report]
+show_missing = true

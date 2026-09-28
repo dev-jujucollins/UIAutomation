@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from appium.webdriver.webdriver import WebDriver
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
+
+from ...utils.locators import predicate_literal
 from ..base_page import BasePage
 
 if TYPE_CHECKING:
@@ -53,23 +57,25 @@ class CalendarsListPage(BasePage):
         Returns:
             CalendarHomePage instance.
         """
-        import time
-
-        from selenium.common.exceptions import StaleElementReferenceException
-
         from .calendar_home import CalendarHomePage
 
-        # Retry logic for stale element issues
-        for attempt in range(3):
+        def close(driver: WebDriver) -> bool:
             try:
-                self.click(self.DONE_BUTTON)
-                break
+                button = driver.find_element(*self.DONE_BUTTON)
+                if not button.is_displayed() or not button.is_enabled():
+                    return False
             except StaleElementReferenceException:
-                if attempt < 2:
-                    time.sleep(0.5)
-                else:
-                    raise
+                return False
+            try:
+                button.click()
+            except StaleElementReferenceException:
+                # A successful tap can dismiss the sheet before the response.
+                # Confirm dismissal below instead of tapping again.
+                pass
+            return True
 
+        self._get_wait(None).until(close)
+        self.wait_for_invisible(self.CALENDARS_TITLE)
         return CalendarHomePage(self.driver)
 
     def get_calendar_names(self) -> list[str]:
@@ -90,7 +96,7 @@ class CalendarsListPage(BasePage):
                     name = label.split(",")[0].strip()
                     if name:
                         calendars.append(name)
-            except Exception:
+            except StaleElementReferenceException:
                 continue
 
         return calendars
@@ -110,7 +116,7 @@ class CalendarsListPage(BasePage):
                 name = cell.get_attribute("name")
                 if isinstance(name, str) and "@" in name and "calendarlist-cell" not in name:
                     accounts.append(name)
-            except Exception:
+            except StaleElementReferenceException:
                 continue
 
         return accounts
@@ -122,13 +128,40 @@ class CalendarsListPage(BasePage):
         Args:
             calendar_name: Name of the calendar to tap.
         """
-        # Try to find by label containing calendar name
-        calendar_locator = (
-            BasePage.By.IOS_PREDICATE,
-            f"type == 'XCUIElementTypeCell' AND label CONTAINS '{calendar_name}'",
+        self._set_calendar_selected(calendar_name, not self.is_calendar_selected(calendar_name))
+
+    def _calendar_locator(self, calendar_name: str) -> tuple[str, str]:
+        """Match the full name, allowing the cell's optional metadata suffix."""
+        return (
+            self.By.IOS_PREDICATE,
+            "type == 'XCUIElementTypeCell' AND "
+            f"(label == {predicate_literal(calendar_name)} OR "
+            f"label BEGINSWITH {predicate_literal(calendar_name + ', ')})",
         )
-        if self.is_element_present(calendar_locator, timeout=3):
-            self.click(calendar_locator)
+
+    def _calendar_selected(self, calendar_name: str) -> bool:
+        """Read an existing cell; only an absent checkmark means unselected."""
+        cell = self.driver.find_element(*self._calendar_locator(calendar_name))
+        try:
+            cell.find_element(self.By.IOS_PREDICATE, "name == 'checkmark.circle.fill'")
+        except NoSuchElementException:
+            return False
+        return True
+
+    def _set_calendar_selected(self, calendar_name: str, selected: bool) -> None:
+        """Require the named calendar, then wait for the requested selection."""
+        if self.is_calendar_selected(calendar_name) != selected:
+            self.click(self._calendar_locator(calendar_name))
+
+        def ready(_: WebDriver) -> bool:
+            try:
+                return self._calendar_selected(calendar_name) == selected
+            except StaleElementReferenceException:
+                return False
+
+        self._get_wait(None).until(
+            ready, message=f"Calendar {calendar_name!r} did not reach selected={selected}"
+        )
 
     def is_calendar_selected(self, calendar_name: str) -> bool:
         """
@@ -140,23 +173,18 @@ class CalendarsListPage(BasePage):
         Returns:
             True if calendar is selected.
         """
-        # Selected calendars have "checkmark.circle.fill" image
-        calendar_locator = (
-            BasePage.By.IOS_PREDICATE,
-            f"type == 'XCUIElementTypeCell' AND label CONTAINS '{calendar_name}'",
-        )
-        if self.is_element_present(calendar_locator, timeout=3):
-            cell = self.find_element(calendar_locator)
-            # Check for checkmark image
+        result = False
+
+        def readable(_: WebDriver) -> bool:
+            nonlocal result
             try:
-                cell.find_element(
-                    BasePage.By.IOS_PREDICATE,
-                    "name == 'checkmark.circle.fill'",
-                )
+                result = self._calendar_selected(calendar_name)
                 return True
-            except Exception:
+            except StaleElementReferenceException:
                 return False
-        return False
+
+        self._get_wait(None).until(readable, message=f"Calendar {calendar_name!r} is unavailable")
+        return result
 
     def select_calendar(self, calendar_name: str) -> None:
         """
@@ -165,8 +193,7 @@ class CalendarsListPage(BasePage):
         Args:
             calendar_name: Name of the calendar to select.
         """
-        if not self.is_calendar_selected(calendar_name):
-            self.tap_calendar(calendar_name)
+        self._set_calendar_selected(calendar_name, True)
 
     def deselect_calendar(self, calendar_name: str) -> None:
         """
@@ -175,8 +202,7 @@ class CalendarsListPage(BasePage):
         Args:
             calendar_name: Name of the calendar to deselect.
         """
-        if self.is_calendar_selected(calendar_name):
-            self.tap_calendar(calendar_name)
+        self._set_calendar_selected(calendar_name, False)
 
     def tap_calendar_info(self, calendar_name: str) -> None:
         """
@@ -185,21 +211,8 @@ class CalendarsListPage(BasePage):
         Args:
             calendar_name: Name of the calendar.
         """
-        # Find the cell and then tap the info button within it
-        calendar_locator = (
-            BasePage.By.IOS_PREDICATE,
-            f"type == 'XCUIElementTypeCell' AND label CONTAINS '{calendar_name}'",
-        )
-        if self.is_element_present(calendar_locator, timeout=3):
-            cell = self.find_element(calendar_locator)
-            try:
-                info_button = cell.find_element(
-                    BasePage.By.IOS_PREDICATE,
-                    "name == 'info.circle'",
-                )
-                info_button.click()
-            except Exception:
-                pass
+        cell = self.find_element(self._calendar_locator(calendar_name))
+        cell.find_element(self.By.IOS_PREDICATE, "name == 'info.circle'").click()
 
     def expand_account(self, account_email: str) -> None:
         """
@@ -209,5 +222,4 @@ class CalendarsListPage(BasePage):
             account_email: Email address of the account.
         """
         account_locator = (BasePage.By.ACCESSIBILITY_ID, account_email)
-        if self.is_element_present(account_locator, timeout=3):
-            self.click(account_locator)
+        self.click(account_locator)

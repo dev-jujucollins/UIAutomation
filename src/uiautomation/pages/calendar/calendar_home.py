@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+from datetime import date
 from typing import TYPE_CHECKING
 
 from ..base_page import BasePage
@@ -95,6 +97,28 @@ class CalendarHomePage(BasePage):
     def tap_today(self) -> None:
         """Navigate to today's date."""
         self.click(self.TODAY_BUTTON)
+        expected = self.get_device_date()
+        self._get_wait(None).until(
+            lambda _: self.get_selected_date() == expected,
+            "Calendar did not navigate to the target's current date",
+        )
+
+    def select_another_visible_day(self) -> date:
+        """Select an unselected date in the day strip and verify navigation."""
+        before = self.get_selected_date()
+        locator = (
+            self.By.IOS_PREDICATE,
+            "type == 'XCUIElementTypeButton' AND name MATCHES "
+            "'^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday), [A-Za-z]+ [0-9]+$'",
+        )
+        candidates = [element for element in self.find_elements(locator) if element.is_displayed()]
+        if not candidates:
+            raise AssertionError("No alternate date is visible in Calendar's day strip")
+        candidates[0].click()
+        self._get_wait(None).until(
+            lambda _: self.get_selected_date() != before, "Calendar date did not change"
+        )
+        return self.get_selected_date()
 
     def tap_back_to_month(self) -> None:
         """
@@ -204,13 +228,42 @@ class CalendarHomePage(BasePage):
         self.scroll_up()
 
     def is_today_selected(self) -> bool:
-        """
-        Check if today's date is currently selected.
+        """Compare the selected day with the device's local date."""
+        return self.get_selected_date() == self.get_device_date()
 
-        Returns:
-            True if today is selected (has "Selected" trait).
-        """
-        if self.is_element_present(self.TODAY_DATE_ELEMENT, timeout=3):
-            # Today's element has "Selected" trait when selected
-            return True
-        return False
+    def get_device_date(self) -> date:
+        """Read Appium's target date; simulators use the server's clock/timezone."""
+        value = self.driver.execute_script("mobile: getDeviceTime", {"format": "YYYY-MM-DD"})
+        if not isinstance(value, str):
+            raise ValueError(f"Unexpected device date: {value!r}")
+        return date.fromisoformat(value)
+
+    @staticmethod
+    def parse_selected_date(label: str) -> date:
+        """Parse the English current-day label, rejecting incomplete dates."""
+        months = (
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+        )
+        for number, month in enumerate(months, start=1):
+            match = re.search(rf"\b(?:{month}|{month[:3]})\s+(\d{{1,2}}),?\s+(\d{{4}})\b", label)
+            if match:
+                return date(int(match[2]), number, int(match[1]))
+        raise ValueError(f"Unrecognized Calendar date label: {label!r}")
+
+    def get_selected_date(self) -> date:
+        """Read the displayed day rather than presence of a Today control."""
+        label = self.get_attribute(self.CURRENT_DAY_LABEL, "label")
+        if label is None:
+            raise ValueError("Calendar current-day control has no date label")
+        return self.parse_selected_date(label)

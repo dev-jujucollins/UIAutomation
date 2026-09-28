@@ -1,12 +1,23 @@
 """Best-effort failure evidence, independent of screenshot fixtures."""
 
 import json
+import os
 import re
 import shutil
 from pathlib import Path
+from urllib.parse import quote
 from uuid import uuid4
 
 from appium.webdriver.webdriver import WebDriver
+
+
+def artifact_links(destination: Path, report_path: Path) -> list[tuple[str, str]]:
+    """Build relocatable links when the HTML and artifact folder move together."""
+    return [
+        (file.name, quote(Path(os.path.relpath(file, report_path.parent)).as_posix()))
+        for file in sorted(destination.iterdir())
+        if file.is_file()
+    ]
 
 
 def capture_failure(

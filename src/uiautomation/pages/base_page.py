@@ -9,6 +9,7 @@ from appium.webdriver.webdriver import WebDriver
 from appium.webdriver.webelement import WebElement
 from selenium.common.exceptions import (
     NoSuchElementException,
+    StaleElementReferenceException,
     TimeoutException,
 )
 from selenium.webdriver.support import expected_conditions
@@ -139,6 +140,78 @@ class BasePage:
         """
         element = self.find_element(locator, timeout)
         return element.text
+
+    def set_switch_state(
+        self,
+        locator: tuple[str, str],
+        enabled: bool,
+        *,
+        click_locator: tuple[str, str] | None = None,
+        timeout: int | None = None,
+    ) -> None:
+        """Set a switch once and wait until a fresh element confirms its state.
+
+        Args:
+            locator: Switch whose value reports its state.
+            enabled: Desired switch state.
+            click_locator: Optional nested control to tap instead of the state element.
+            timeout: Optional timeout override.
+
+        Raises:
+            TimeoutException: If the requested state cannot be confirmed.
+        """
+        expected = "1" if enabled else "0"
+        clicked = False
+
+        def ready(driver: WebDriver) -> bool:
+            nonlocal clicked
+            try:
+                switch = driver.find_element(*locator)
+                value = switch.get_attribute("value")
+                if value == expected:
+                    return True
+                if clicked or value not in ("0", "1"):
+                    return False
+                control = driver.find_element(*click_locator) if click_locator else switch
+                if not control.is_displayed() or not control.is_enabled():
+                    return False
+                # A stale response may arrive after a successful tap. Never toggle
+                # twice while waiting for an asynchronously refreshed switch value.
+                clicked = True
+                control.click()
+            except StaleElementReferenceException:
+                return False
+            return False
+
+        self._get_wait(timeout).until(
+            ready, message=f"Switch {locator!r} did not reach value {expected!r}"
+        )
+
+    def wait_for_attribute(
+        self,
+        locator: tuple[str, str],
+        attribute: str,
+        value: str,
+        timeout: int | None = None,
+    ) -> None:
+        """Wait for an attribute value, re-finding controls during UI refreshes.
+
+        Args:
+            locator: Element to check.
+            attribute: Attribute name.
+            value: Required attribute value.
+            timeout: Optional timeout override.
+        """
+
+        def matches(driver: WebDriver) -> bool:
+            try:
+                return driver.find_element(*locator).get_attribute(attribute) == value
+            except StaleElementReferenceException:
+                return False
+
+        self._get_wait(timeout).until(
+            matches, message=f"Element {locator!r} did not reach {attribute}={value!r}"
+        )
 
     def get_attribute(
         self, locator: tuple[str, str], attribute: str, timeout: int | None = None
@@ -305,9 +378,16 @@ class BasePage:
         Returns:
             The found element or None if not found.
         """
-        for _ in range(max_scrolls):
+        if max_scrolls < 0:
+            raise ValueError("max_scrolls must be non-negative")
+        if direction not in ("up", "down"):
+            raise ValueError("direction must be 'up' or 'down'")
+        for attempt in range(max_scrolls + 1):
             if self.is_element_visible(locator, timeout=1):
                 return self.find_element(locator)
+
+            if attempt == max_scrolls:
+                break
 
             if direction == "down":
                 self.scroll_down()

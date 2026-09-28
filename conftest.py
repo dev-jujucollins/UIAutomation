@@ -12,12 +12,13 @@ import pytest
 from appium.webdriver.webdriver import WebDriver
 
 from uiautomation.drivers.ios_driver import IOSDriver, IOSDriverConfig, SystemApps
-from uiautomation.pages.calendar import CalendarHomePage, CalendarOnboardingPage
+from uiautomation.pages.calendar import CalendarHomePage, CalendarOnboardingPage, NewEventPage
 from uiautomation.pages.maps import MapsPage
 from uiautomation.pages.messages import ComposeMessagePage, ConversationPage, MessagesHomePage
 from uiautomation.pages.settings import SettingsHomePage, WifiSettingsPage
 from uiautomation.utils.app_launcher import AppLauncher
-from uiautomation.utils.failure_artifacts import capture_failure
+from uiautomation.utils.failure_artifacts import artifact_links, capture_failure
+from uiautomation.utils.run_reporting import RunReport
 from uiautomation.utils.simulator_control import get_preferred_simulator
 
 # -------------------------------------------------------------------------
@@ -27,6 +28,7 @@ from uiautomation.utils.simulator_control import get_preferred_simulator
 
 RUN_DIRECTORY = pytest.StashKey[Path]()
 ACTIVE_DRIVER = pytest.StashKey[WebDriver]()
+RUN_REPORT = pytest.StashKey[RunReport]()
 
 
 def pytest_addoption(parser):
@@ -36,6 +38,11 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         "--run-diagnostics", action="store_true", help="Include environment-dependent diagnostics"
+    )
+    parser.addoption(
+        "--run-lifecycle",
+        action="store_true",
+        help="Enable owned-data lifecycle tests on an explicitly named simulator",
     )
     parser.addoption(
         "--restart-simulator",
@@ -100,6 +107,18 @@ def pytest_configure(config: pytest.Config) -> None:
             "Parallel iOS tests are unsupported: use -n 0; unit tests may use -n auto."
         )
     config.stash[RUN_DIRECTORY] = Path(config.getoption("--artifacts-dir")).resolve() / uuid4().hex
+    recorder = RunReport(
+        config.stash[RUN_DIRECTORY],
+        config.rootpath,
+        config.getoption("--run-integration"),
+        {
+            "kind": "physical" if config.getoption("--udid") else "simulator",
+            "device_name": config.getoption("--device-name"),
+            "platform_version": config.getoption("--platform-version"),
+        },
+    )
+    config.stash[RUN_REPORT] = recorder
+    config.pluginmanager.register(recorder, "uiautomation-run-report")
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -107,7 +126,14 @@ def pytest_fixture_setup(fixturedef, request):
     """Remember completed driver fixtures even if a dependent fixture fails."""
     outcome = yield
     if fixturedef.argname == "driver" and outcome.excinfo is None:
-        request.node.stash[ACTIVE_DRIVER] = outcome.get_result()
+        driver = outcome.get_result()
+        request.node.stash[ACTIVE_DRIVER] = driver
+        capabilities = getattr(driver, "capabilities", None)
+        if isinstance(capabilities, dict):
+            request.config.stash[RUN_REPORT].set_capabilities(capabilities)
+    if fixturedef.argname == "driver_config" and outcome.excinfo is None:
+        target = outcome.get_result()
+        request.config.stash[RUN_REPORT].set_target(target.device_name, target.platform_version)
 
 
 @pytest.hookimpl(tryfirst=True)
@@ -297,6 +323,25 @@ def calendar_home(
     yield calendar_page
 
 
+@pytest.fixture
+def calendar_draft(request: pytest.FixtureRequest, calendar_home: CalendarHomePage) -> NewEventPage:
+    """Own one Calendar editor, registering discard before opening it."""
+    editor = NewEventPage(calendar_home.driver)
+    request.addfinalizer(editor.discard)
+    return calendar_home.tap_add_event()
+
+
+@pytest.fixture
+def lifecycle_simulator(request: pytest.FixtureRequest, is_simulator: bool) -> None:
+    """Require an explicit simulator selection before accessing writable app data."""
+    if not request.config.getoption("--run-lifecycle"):
+        pytest.skip("Owned-data tests require --run-lifecycle")
+    if not is_simulator:
+        pytest.skip("Owned-data lifecycle tests require a simulator")
+    if request.config.getoption("--device-name") is None:
+        raise pytest.UsageError("Lifecycle tests require --device-name for an isolated simulator")
+
+
 # -------------------------------------------------------------------------
 # Utility Fixtures
 # -------------------------------------------------------------------------
@@ -377,6 +422,15 @@ def pytest_runtest_makereport(item, call):
                 str(report.longrepr),
             )
             report.sections.append(("Failure artifacts", str(destination)))
+            report.user_properties.append(("failure_artifacts", str(destination)))
+            html_path = item.config.getoption("htmlpath", default=None)
+            if html_path and item.config.pluginmanager.hasplugin("html"):
+                from pytest_html import extras
+
+                report.extras = getattr(report, "extras", []) + [
+                    extras.url(url, name=name)
+                    for name, url in artifact_links(destination, Path(html_path).resolve())
+                ]
         except Exception:
             logging.getLogger(__name__).exception("Unable to save failure artifacts")
 

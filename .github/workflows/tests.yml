@@ -1,20 +1,36 @@
 name: Framework checks
 on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
   unit:
     runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: ${{ matrix.python }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-      - run: uv sync --locked --no-editable
+      - run: uv python install "${{ matrix.python }}"
+      - run: uv sync --locked --no-editable --python "${{ matrix.python }}"
       - run: uv run --no-editable ruff check .
       - run: uv run --no-editable ruff format --check .
       - run: uv run --no-editable pyright
-      - run: uv run --no-editable pytest tests/unit
+      - run: >-
+          uv run --no-editable pytest tests/unit
+          --cov=uiautomation --cov-branch --cov-report=term-missing
+          --cov-report=xml:reports/coverage.xml --cov-report=html:reports/coverage
+          --junitxml=reports/unit.xml --html=reports/unit.html --self-contained-html
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
-          name: failure-artifacts
-          path: artifacts/
+          name: unit-python-${{ matrix.python }}
+          path: |
+            artifacts/
+            reports/
+          retention-days: 14

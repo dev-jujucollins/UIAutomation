@@ -5,6 +5,7 @@ from xml.etree import ElementTree
 
 import pytest
 from selenium.common.exceptions import StaleElementReferenceException
+from selenium.webdriver.support.wait import WebDriverWait
 
 from uiautomation.pages.settings.settings_home import SettingsHomePage
 
@@ -115,3 +116,17 @@ def test_readiness_retries_a_stale_hierarchy() -> None:
     assert SettingsHomePage(driver).get_home_readiness_failures() == [
         "Settings hierarchy changed during readiness check"
     ]
+
+
+def test_settings_search_requires_the_entered_query_to_appear() -> None:
+    driver, field = MagicMock(), MagicMock()
+    driver.find_element.return_value = field
+    field.is_displayed.return_value = True
+    field.is_enabled.return_value = True
+    field.get_attribute.side_effect = ["", "Wi-Fi"]
+    page = SettingsHomePage(driver)
+    page._wait = WebDriverWait(driver, 0.02, poll_frequency=0.001)
+    page.search_settings("Wi-Fi")
+    field.clear.assert_called_once()
+    field.send_keys.assert_called_once_with("Wi-Fi")
+    assert field.get_attribute.call_count == 2

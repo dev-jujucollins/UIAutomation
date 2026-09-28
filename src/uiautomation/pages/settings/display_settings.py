@@ -144,15 +144,21 @@ class DisplaySettingsPage(BasePage):
 
     def toggle_automatic_appearance(self) -> None:
         """Toggle automatic appearance switching."""
-        import time
+        self.set_automatic_appearance(not self.is_automatic_appearance_enabled())
 
+    def set_automatic_appearance(self, enabled: bool) -> None:
+        """Set automatic appearance and confirm the switch value.
+
+        Args:
+            enabled: Whether automatic appearance should be on.
+        """
         # iOS 26.3: Need to click the inner switch element, not the outer container
-        if self.is_element_present(self.AUTOMATIC_SWITCH_INNER, timeout=2):
-            self.click(self.AUTOMATIC_SWITCH_INNER)
-        else:
-            self.click(self.AUTOMATIC_SWITCH)
-        # Wait for UI to settle after toggle
-        time.sleep(1)
+        click_locator = (
+            self.AUTOMATIC_SWITCH_INNER
+            if self.is_element_present(self.AUTOMATIC_SWITCH_INNER, timeout=2)
+            else self.AUTOMATIC_SWITCH
+        )
+        self.set_switch_state(self.AUTOMATIC_SWITCH, enabled, click_locator=click_locator)
 
     def is_automatic_appearance_enabled(self) -> bool:
         """
@@ -168,13 +174,11 @@ class DisplaySettingsPage(BasePage):
 
     def enable_automatic_appearance(self) -> None:
         """Enable automatic appearance if not already enabled."""
-        if not self.is_automatic_appearance_enabled():
-            self.toggle_automatic_appearance()
+        self.set_automatic_appearance(True)
 
     def disable_automatic_appearance(self) -> None:
         """Disable automatic appearance if currently enabled."""
-        if self.is_automatic_appearance_enabled():
-            self.toggle_automatic_appearance()
+        self.set_automatic_appearance(False)
 
     # -------------------------------------------------------------------------
     # Brightness
@@ -238,25 +242,29 @@ class DisplaySettingsPage(BasePage):
 
     def toggle_true_tone(self) -> None:
         """Toggle True Tone on/off."""
-        import time
+        self.set_true_tone(not self.is_true_tone_enabled())
 
+    def set_true_tone(self, enabled: bool) -> None:
+        """Set True Tone and confirm the switch value.
+
+        Args:
+            enabled: Whether True Tone should be on.
+        """
         # iOS 26.3: Need to click the inner switch element, not the outer container
-        if self.is_element_present(self.TRUE_TONE_SWITCH_INNER, timeout=2):
-            self.click(self.TRUE_TONE_SWITCH_INNER)
-            time.sleep(1)
-        elif self.is_element_present(self.TRUE_TONE_SWITCH):
-            self.click(self.TRUE_TONE_SWITCH)
-            time.sleep(1)
+        click_locator = (
+            self.TRUE_TONE_SWITCH_INNER
+            if self.is_element_present(self.TRUE_TONE_SWITCH_INNER, timeout=2)
+            else self.TRUE_TONE_SWITCH
+        )
+        self.set_switch_state(self.TRUE_TONE_SWITCH, enabled, click_locator=click_locator)
 
     def enable_true_tone(self) -> None:
         """Enable True Tone if not already enabled."""
-        if not self.is_true_tone_enabled():
-            self.toggle_true_tone()
+        self.set_true_tone(True)
 
     def disable_true_tone(self) -> None:
         """Disable True Tone if currently enabled."""
-        if self.is_true_tone_enabled():
-            self.toggle_true_tone()
+        self.set_true_tone(False)
 
     # -------------------------------------------------------------------------
     # Night Shift

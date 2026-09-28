@@ -3,12 +3,14 @@ App Launcher utility for managing iOS system apps.
 """
 
 import subprocess
-import time
 from enum import Enum
 
 from appium.webdriver.webdriver import WebDriver
+from selenium.common.exceptions import TimeoutException, WebDriverException
+from selenium.webdriver.support.wait import WebDriverWait
 
 from ..drivers.ios_driver import SystemApps
+from .simulator_control import list_available_simulators
 
 
 class AppState(Enum):
@@ -28,6 +30,8 @@ class AppLauncher:
     Provides convenient methods for launching system apps,
     checking app states, and managing app lifecycle.
     """
+
+    LAUNCH_TIMEOUT = 5
 
     def __init__(self, driver: WebDriver):
         """
@@ -51,13 +55,12 @@ class AppLauncher:
 
         try:
             self.driver.execute_script("mobile: launchApp", {"bundleId": app.value})
-        except Exception:
+        except WebDriverException:
             pass
         if self._is_foreground(app):
             return
 
-        if self._launch_with_simctl(app):
-            time.sleep(1)
+        self._launch_with_simctl(app)
         if not self._is_foreground(app):
             raise RuntimeError(f"Failed to launch {app.value}")
 
@@ -88,16 +91,24 @@ class AppLauncher:
 
     def _is_foreground(self, app: SystemApps) -> bool:
         """Return whether target app is currently foregrounded."""
-        time.sleep(0.5)
         try:
-            return self.get_state(app) == AppState.FOREGROUND
-        except Exception:
+            WebDriverWait(self.driver, self.LAUNCH_TIMEOUT).until(
+                lambda _: self.get_state(app) == AppState.FOREGROUND
+            )
+            return True
+        except TimeoutException:
             return False
 
     def _launch_with_simctl(self, app: SystemApps) -> bool:
         """Fallback to simctl launch for simulator-only system apps."""
         udid = str(self.driver.capabilities.get("udid", ""))
-        if "-" not in udid:
+        if not udid:
+            return False
+        try:
+            simulators = list_available_simulators()
+        except (OSError, subprocess.SubprocessError):
+            return False
+        if not any(device.is_available and device.udid == udid for device in simulators):
             return False
 
         subprocess.run(  # noqa: S603

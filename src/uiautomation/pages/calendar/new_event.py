@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from appium.webdriver.webdriver import WebDriver
+from appium.webdriver.webelement import WebElement
+from selenium.common.exceptions import StaleElementReferenceException
+
 from ..base_page import BasePage
 
 if TYPE_CHECKING:
@@ -25,7 +29,8 @@ class NewEventPage(BasePage):
     )
     ADD_DONE_BUTTON = (
         BasePage.By.IOS_PREDICATE,
-        "type == 'XCUIElementTypeButton' AND (name == 'add-button' OR name == 'Done')",
+        "type == 'XCUIElementTypeButton' AND "
+        "(name == 'add-button' OR name == 'done-button' OR name == 'Done')",
     )
     NEW_TITLE = (
         BasePage.By.IOS_PREDICATE,
@@ -87,6 +92,9 @@ class NewEventPage(BasePage):
             title: Event title text.
         """
         self.send_keys(self.TITLE_FIELD, title, clear_first=True)
+        self._get_wait(None).until(
+            lambda _: self.get_title() == title, "Calendar title did not match entered text"
+        )
 
     def get_title(self) -> str | None:
         """
@@ -205,8 +213,77 @@ class NewEventPage(BasePage):
         """
         from .calendar_home import CalendarHomePage
 
-        self.click(self.CANCEL_BUTTON)
+        self.discard()
         return CalendarHomePage(self.driver)
+
+    def discard(self) -> None:
+        """Close known draft/detail states and verify an unobstructed Calendar home."""
+        from .calendar_home import CalendarHomePage
+        from .calendar_onboarding import CalendarOnboardingPage
+
+        discard_changes = (self.By.ACCESSIBILITY_ID, "Discard Changes")
+        detail_title = (self.By.ACCESSIBILITY_ID, "event-details-title-text")
+        detail_close = (self.By.ACCESSIBILITY_ID, "cancel-button")
+        clicked: set[str] = set()
+        home_checks = 0
+
+        def visible(locator: tuple[str, str]) -> WebElement | None:
+            for element in self.driver.find_elements(*locator):
+                if element.is_displayed():
+                    return element
+            return None
+
+        def dismiss_next(_: WebDriver) -> bool:
+            nonlocal home_checks
+            try:
+                if visible(CalendarOnboardingPage.NOTIFICATIONS_ALERT):
+                    CalendarOnboardingPage(self.driver).dismiss_notifications_permission()
+                    home_checks = 0
+                    return False
+                button = visible(discard_changes)
+                if button is None:
+                    # The title may be offscreen after scrolling, but its editor
+                    # still exists. A detail screen has its own explicit anchor.
+                    editor_open = bool(self.driver.find_elements(*self.TITLE_FIELD)) or bool(
+                        visible(self.NEW_TITLE)
+                    )
+                    if editor_open:
+                        button = visible(self.CANCEL_BUTTON)
+                    elif visible(detail_title):
+                        button = visible(detail_close)
+                if button is not None:
+                    home_checks = 0
+                    if button.id not in clicked:
+                        if len(clicked) >= 6:
+                            raise AssertionError("Calendar cleanup exceeded six known dismissals")
+                        clicked.add(button.id)
+                        button.click()
+                    return False
+                editor_present = bool(self.driver.find_elements(*self.TITLE_FIELD))
+                blocked = any(
+                    visible((self.By.CLASS_NAME, kind))
+                    for kind in ("XCUIElementTypeAlert", "XCUIElementTypeSheet")
+                )
+                home_ready = (
+                    not editor_present
+                    and not blocked
+                    and not visible(detail_title)
+                    and (
+                        visible(CalendarHomePage.DAY_VIEW_NAV_BAR)
+                        or visible(CalendarHomePage.MONTH_VIEW_NAV_BAR)
+                    )
+                    and visible(CalendarHomePage.TODAY_BUTTON)
+                    and visible(CalendarHomePage.ADD_BUTTON)
+                )
+                home_checks = home_checks + 1 if home_ready else 0
+                return home_checks >= 2
+            except StaleElementReferenceException:
+                home_checks = 0
+                return False
+
+        self._get_wait(None).until(
+            dismiss_next, "Calendar home not restored after discarding known editor/detail screens"
+        )
 
     def tap_done(self) -> CalendarHomePage:
         """
@@ -218,6 +295,7 @@ class NewEventPage(BasePage):
         from .calendar_home import CalendarHomePage
 
         self.click(self.ADD_DONE_BUTTON)
+        self.wait_for_invisible(self.TITLE_FIELD)
         return CalendarHomePage(self.driver)
 
     def is_done_enabled(self) -> bool:

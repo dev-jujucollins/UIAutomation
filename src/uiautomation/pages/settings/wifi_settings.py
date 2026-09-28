@@ -5,7 +5,9 @@ Settings App - Wi-Fi Settings Page Object
 from appium.webdriver.common.appiumby import AppiumBy
 from appium.webdriver.webdriver import WebDriver
 from appium.webdriver.webelement import WebElement
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 
+from ...utils.locators import predicate_literal
 from ..base_page import BasePage
 
 
@@ -91,39 +93,16 @@ class WifiSettingsPage(BasePage):
         return value == "1"
 
     def toggle_wifi(self) -> None:
-        """Toggle Wi-Fi on/off."""
-        import time
-
-        from selenium.common.exceptions import StaleElementReferenceException
-
-        # iOS 26.3: The Wi-Fi page reloads after toggling, causing stale elements
-        # Use retry logic to handle this
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                # Re-find the element fresh each time
-                element = self.find_element(self.WIFI_SWITCH, timeout=5)
-                element.click()
-                break
-            except StaleElementReferenceException:
-                if attempt < max_retries - 1:
-                    time.sleep(1)
-                else:
-                    raise
-
-        # Wait for UI to settle after toggle - iOS 26.3 needs more time
-        # as the entire Wi-Fi section reloads
-        time.sleep(2)
+        """Toggle Wi-Fi and confirm the new state after the page refreshes."""
+        self.set_switch_state(self.WIFI_SWITCH, not self.is_wifi_enabled())
 
     def enable_wifi(self) -> None:
         """Enable Wi-Fi if not already enabled."""
-        if not self.is_wifi_enabled():
-            self.toggle_wifi()
+        self.set_switch_state(self.WIFI_SWITCH, True)
 
     def disable_wifi(self) -> None:
         """Disable Wi-Fi if not already disabled."""
-        if self.is_wifi_enabled():
-            self.toggle_wifi()
+        self.set_switch_state(self.WIFI_SWITCH, False)
 
     # -------------------------------------------------------------------------
     # Network Discovery
@@ -138,11 +117,6 @@ class WifiSettingsPage(BasePage):
         """
         if not self.is_wifi_enabled():
             return []
-
-        # Wait for networks to load - iOS 26.3 may need scrolling to see Networks section
-        import time
-
-        time.sleep(2)  # Allow time for network scan
 
         # Try to find the Networks section, scroll if needed
         if not self.is_element_present(self.NETWORKS_SECTION, timeout=3):
@@ -168,7 +142,7 @@ class WifiSettingsPage(BasePage):
                         network_name = label.split(",")[0].strip()
                         if network_name and network_name not in networks:
                             networks.append(network_name)
-            except Exception:
+            except StaleElementReferenceException:
                 continue
 
         return networks
@@ -304,16 +278,17 @@ class WifiSettingsPage(BasePage):
                 )
                 info_button.click()
                 return True
-            except Exception:
+            except NoSuchElementException:
                 return False
         return False
 
     def _network_cell_locator(self, network_name: str) -> tuple[str, str]:
         """Build a locator for a specific network cell."""
-        escaped_network_name = network_name.replace("\\", "\\\\").replace("'", "\\'")
         return (
             self.By.IOS_PREDICATE,
-            f"type == 'XCUIElementTypeCell' AND label BEGINSWITH '{escaped_network_name}'",
+            "type == 'XCUIElementTypeCell' AND "
+            f"(label == {predicate_literal(network_name)} OR "
+            f"label BEGINSWITH {predicate_literal(network_name + ', ')})",
         )
 
     def _is_selected_network_cell(self, cell: WebElement) -> bool:
@@ -333,7 +308,7 @@ class WifiSettingsPage(BasePage):
                 "type == 'XCUIElementTypeImage' AND name == 'Selected'",
             )
             return True
-        except Exception:
+        except NoSuchElementException:
             return False
 
     def forget_current_network(self) -> bool:

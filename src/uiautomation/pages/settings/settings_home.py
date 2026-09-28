@@ -229,15 +229,13 @@ class SettingsHomePage(BasePage):
         """
         # iOS 26.3: Search field is in the toolbar at the bottom of the screen
         # No need to scroll - just tap the search field directly
-        import time
-
         # Wait for search field to be available
         self.wait_for_clickable(self.SEARCH_FIELD, timeout=5)
         self.click(self.SEARCH_FIELD)
-        time.sleep(0.5)  # Wait for keyboard to appear
-
         # Send keys to the search field
         self.send_keys(self.SEARCH_FIELD, query, clear_first=True)
+        if query:
+            self.wait_for_attribute(self.SEARCH_FIELD, "value", query)
 
     def clear_search(self) -> None:
         """Clear the search field."""
@@ -271,6 +269,14 @@ class SettingsHomePage(BasePage):
 
     def toggle_airplane_mode(self) -> None:
         """Toggle airplane mode switch."""
+        self.set_airplane_mode(not self.is_airplane_mode_on())
+
+    def set_airplane_mode(self, enabled: bool) -> None:
+        """Set airplane mode and wait until its reported value matches.
+
+        Args:
+            enabled: Whether airplane mode should be on.
+        """
         # iOS 26: The actual toggle is the inner XCUIElementTypeSwitch without a name
         # inside the parent element with name='com.apple.settings.airplaneMode'
         inner_switch = (
@@ -279,14 +285,10 @@ class SettingsHomePage(BasePage):
             "/XCUIElementTypeSwitch",
         )
         # Try inner switch first, fall back to parent element
-        if self.is_element_present(inner_switch, timeout=2):
-            self.click(inner_switch)
-        else:
-            self.click(self.AIRPLANE_MODE)
-        # Wait for the toggle animation to complete
-        import time
-
-        time.sleep(1)
+        click_locator = (
+            inner_switch if self.is_element_present(inner_switch, timeout=2) else self.AIRPLANE_MODE
+        )
+        self.set_switch_state(self.AIRPLANE_MODE, enabled, click_locator=click_locator)
 
     def is_airplane_mode_on(self) -> bool:
         """

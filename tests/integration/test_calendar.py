@@ -12,7 +12,7 @@ These tests verify Calendar app functionality including:
 import pytest
 
 from uiautomation.drivers.ios_driver import SystemApps
-from uiautomation.pages.calendar import CalendarHomePage, CalendarOnboardingPage
+from uiautomation.pages.calendar import CalendarHomePage, CalendarOnboardingPage, NewEventPage
 from uiautomation.utils.app_launcher import AppLauncher
 
 
@@ -27,30 +27,17 @@ class TestCalendarNavigation:
 
     def test_current_month_displayed(self, calendar_home: CalendarHomePage):
         """Verify current month is displayed."""
-        month = calendar_home.get_current_month()
-        assert month is not None
-        # Month should be a valid month name
-        valid_months = [
-            "January",
-            "February",
-            "March",
-            "April",
-            "May",
-            "June",
-            "July",
-            "August",
-            "September",
-            "October",
-            "November",
-            "December",
-        ]
-        assert month in valid_months
+        calendar_home.tap_today()
+        assert calendar_home.get_selected_date() == calendar_home.get_device_date()
+        assert calendar_home.get_current_month() == calendar_home.get_device_date().strftime("%B")
 
     def test_tap_today(self, calendar_home: CalendarHomePage):
         """Test tapping the Today button."""
         calendar_home.tap_today()
-        # Should still be on calendar home
-        assert calendar_home.is_on_calendar_home()
+        previous = calendar_home.select_another_visible_day()
+        assert previous != calendar_home.get_device_date()
+        calendar_home.tap_today()
+        assert calendar_home.is_today_selected()
 
     @pytest.mark.journey
     def test_navigate_to_month_view(self, calendar_home: CalendarHomePage):
@@ -69,18 +56,18 @@ class TestCalendarAddEvent:
     """Tests for creating calendar events."""
 
     @pytest.mark.journey
-    def test_open_new_event(self, calendar_home: CalendarHomePage):
+    def test_open_new_event(self, calendar_draft: NewEventPage):
         """Test opening the new event screen."""
-        new_event_page = calendar_home.tap_add_event()
+        new_event_page = calendar_draft
         assert new_event_page.is_on_new_event_page()
         # Cancel to return to calendar; verify the sheet actually closes.
         home = new_event_page.tap_cancel()
         assert new_event_page.wait_for_invisible(new_event_page.TITLE_FIELD)
         assert home.is_on_calendar_home()
 
-    def test_new_event_fields_visible(self, calendar_home: CalendarHomePage):
+    def test_new_event_fields_visible(self, calendar_draft: NewEventPage):
         """Verify all expected fields are visible on new event screen."""
-        new_event_page = calendar_home.tap_add_event()
+        new_event_page = calendar_draft
 
         # Title field should be present
         assert new_event_page.is_element_present(new_event_page.TITLE_FIELD)
@@ -92,9 +79,9 @@ class TestCalendarAddEvent:
         # Cancel to return
         new_event_page.tap_cancel()
 
-    def test_set_event_title(self, calendar_home: CalendarHomePage):
+    def test_set_event_title(self, calendar_draft: NewEventPage):
         """Test setting an event title."""
-        new_event_page = calendar_home.tap_add_event()
+        new_event_page = calendar_draft
 
         test_title = "Test Meeting"
         new_event_page.set_title(test_title)
@@ -105,9 +92,9 @@ class TestCalendarAddEvent:
         # Cancel without saving
         new_event_page.tap_cancel()
 
-    def test_toggle_all_day(self, calendar_home: CalendarHomePage):
+    def test_toggle_all_day(self, calendar_draft: NewEventPage):
         """Test toggling the All-day switch."""
-        new_event_page = calendar_home.tap_add_event()
+        new_event_page = calendar_draft
 
         initial_state = new_event_page.is_all_day_enabled()
         new_event_page.toggle_all_day()
@@ -118,9 +105,9 @@ class TestCalendarAddEvent:
         # Cancel to return
         new_event_page.tap_cancel()
 
-    def test_event_reminder_tabs(self, calendar_home: CalendarHomePage):
+    def test_event_reminder_tabs(self, calendar_draft: NewEventPage):
         """Test Event/Reminder tab switching."""
-        new_event_page = calendar_home.tap_add_event()
+        new_event_page = calendar_draft
 
         # Event tab should be selected by default
         assert new_event_page.is_event_tab_selected()
@@ -194,7 +181,7 @@ class TestCalendarEventCreation:
     """Tests for full event creation workflow."""
 
     @pytest.mark.real_device(reason="Event draft dismissal returns inconsistent views on simulator")
-    def test_create_event_draft_without_persisting(self, calendar_home: CalendarHomePage):
+    def test_create_event_draft_without_persisting(self, calendar_draft: NewEventPage):
         """Test event creation flow without leaving persisted data behind."""
         import uuid
 
@@ -202,7 +189,7 @@ class TestCalendarEventCreation:
         unique_id = str(uuid.uuid4())[:8]
         event_title = f"AutoTest Event {unique_id}"
 
-        new_event_page = calendar_home.tap_add_event()
+        new_event_page = calendar_draft
         new_event_page.set_title(event_title)
         assert new_event_page.is_done_enabled()
 

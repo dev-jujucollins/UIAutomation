@@ -165,3 +165,47 @@ def test_radio(hardware): pass
     assert not (harness.path / "started").exists()
     harness.runpytest_subprocess("--udid", "physical-id", "-q").assert_outcomes(passed=1)
     assert (harness.path / "started").exists()
+
+
+def test_html_report_links_artifacts_and_manifest_records_failure(harness) -> None:
+    """Exercise report hooks with an actual pytest-html report and failed test."""
+    harness.makepyfile("""
+import pytest
+from pathlib import Path
+class Driver:
+    capabilities = {"deviceName": "Test iPhone", "platformVersion": "27.0", "udid": "secret-id"}
+    page_source = "<Application/>"
+    def save_screenshot(self, path):
+        Path(path).write_bytes(b"screen")
+        return True
+@pytest.fixture
+def driver(): return Driver()
+def test_sample(driver): assert False, "intentional failure"
+""")
+    harness.runpytest_subprocess(
+        "-q", "--html=reports/tests.html", "--self-contained-html", "--junitxml=reports/tests.xml"
+    ).assert_outcomes(failed=1)
+    manifest_path = next(harness.path.glob("artifacts/*/run.json"))
+    manifest = json.loads(manifest_path.read_text())
+    assert manifest["summary"] == {"failed": 1}
+    assert manifest["target"]["device_name"] == "Test iPhone"
+    assert manifest["target"]["platform_version"] == "27.0"
+    assert "secret-id" not in manifest_path.read_text()
+    assert manifest["results"][1]["artifacts"]
+    html = (harness.path / "reports/tests.html").read_text()
+    assert "../artifacts/" in html
+    assert "screen.png" in html and "page.xml" in html and "failure.json" in html
+    assert (harness.path / "reports/tests.xml").exists()
+
+
+def test_parallel_unit_manifest_aggregates_worker_results(harness) -> None:
+    """The controller's manifest includes every worker's result."""
+    harness.makepyfile("""
+def test_one(): pass
+def test_two(): pass
+""")
+    harness.runpytest_subprocess("-q", "-n", "2").assert_outcomes(passed=2)
+    manifests = [json.loads(path.read_text()) for path in harness.path.glob("artifacts/*/run.json")]
+    controller = next(manifest for manifest in manifests if manifest["worker"] is None)
+    assert controller["summary"] == {"passed": 2}
+    assert len(controller["results"]) == 6

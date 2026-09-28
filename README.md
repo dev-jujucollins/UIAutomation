@@ -8,7 +8,8 @@ Runtime code lives in `src/uiautomation/`; tests use pytest.
 | App | Bundle ID | Automated coverage |
 | --- | --- | --- |
 | Settings | `com.apple.Preferences` | Home readiness, General/About, plus physical-device Wi-Fi, display, search, and radio cases |
-| Calendar | `com.apple.mobilecal` | Onboarding, day/month navigation, event draft fields/cancel, and calendar lists |
+| Calendar | `com.apple.mobilecal` | Onboarding, verified date navigation, owned draft cleanup, calendar lists, and opt-in saved-event lifecycle |
+| Contacts | `com.apple.MobileAddressBook` | Opt-in create, relaunch, exact-name search, Unicode editing, deletion, and cleanup |
 | Messages | `com.apple.MobileSMS` | Home, compose/cancel, recipient text, plain/Unicode/multiline drafts, discard, and seeded-conversation navigation |
 | Maps | `com.apple.Maps` | Location allow/deny, search editing, landmark details, Directions entry, and driving/walking route previews |
 
@@ -16,6 +17,9 @@ Messages tests do not send messages. Maps tests do not start navigation; route
 previews use explicit coordinates through the native Maps URL handler. Manual
 origin editing and real GPS behavior are outside current automated coverage.
 Other apps listed in `SystemApps` have bundle identifiers, not implemented test suites.
+
+Saved-data journeys require `--run-lifecycle` and an explicitly named simulator.
+See [lifecycle testing](docs/lifecycle-testing.md) for isolation and cleanup rules.
 
 Messages and Maps flows were exercised on an English iOS 27.0 iPhone 17 Pro
 simulator. Locators and seed-data assumptions are runtime-specific; installed
@@ -46,6 +50,17 @@ For local device testing, install Appium and its driver:
 npm install -g appium
 appium driver install xcuitest
 ```
+
+Check the toolchain before starting device tests:
+
+```bash
+uv run uiautomation doctor --platform-version 27.0
+uv run uiautomation doctor --platform-version 27.0 --headless-simulator --json
+```
+
+The default doctor command is read-only and reports missing tools, target selection,
+driver versions, and Appium readiness. See [setup checks](docs/setup.md) for options,
+exit codes, and the observed toolchain combination.
 
 Install simulator runtimes in Xcode Settings. Create simulators in Device Hub or
 with `simctl`. The framework boots existing simulators; it does not create them
@@ -155,6 +170,21 @@ registered marker does not automatically mark every integration test.
 See [Messages testing](docs/messages-testing.md) for seed-data assumptions and
 [Maps testing](docs/maps-testing.md) for exact assertions and coverage boundaries.
 
+### Saved Calendar and Contacts data
+
+Create or choose a dedicated simulator using the [lifecycle setup guide](docs/lifecycle-testing.md),
+then run:
+
+```bash
+uv run pytest --run-integration --run-lifecycle -m lifecycle \
+  --device-name "UIAutomation Lifecycle" --platform-version 27.0 --timeout=600
+```
+
+Each case creates uniquely named data, verifies persistence and edits, deletes it,
+and verifies absence. Finalizers remove only exact names registered by that case,
+including when setup or assertions fail. These cases skip before driver setup without
+the opt-in and never run on physical devices.
+
 ## Runtime setup, state, and artifacts
 
 One Appium driver session is reused per pytest run. Integration tests run serially;
@@ -190,6 +220,10 @@ metadata and, when available, screenshots, page XML, and local Appium logs. Miss
 captures are recorded in metadata. External servers must supply logs separately.
 Use `--artifacts-dir PATH` to change the output root.
 
+Every executed run also writes `run.json` with commit, tool versions, selected target,
+sanitized capabilities, phase durations, outcomes, and failure artifact locations.
+HTML reports link to available evidence. See [reporting](docs/reporting.md).
+
 Setup subprocesses have bounded timeouts. Pytest defaults to 120 seconds per test;
 examples use 300 seconds to allow setup. A first WebDriverAgent build may require
 `--timeout=600`.
@@ -214,6 +248,7 @@ Maps accepts the same selected simulator as the other app fixtures; no special n
 | --- | --- | --- |
 | `--run-integration` | off | Enable device tests |
 | `--run-diagnostics` | off | Include diagnostic cases; device cases still need `--run-integration` |
+| `--run-lifecycle` | off | Enable owned-data journeys on an explicitly named simulator |
 | `--device-name` | auto | Exact simulator name; physical-device name when `--udid` is supplied |
 | `--platform-version` | auto | Exact simulator runtime; provide actual OS version for physical devices |
 | `--appium-server` | `http://localhost:4723` | Appium endpoint |
@@ -258,15 +293,16 @@ UIAutomation/
 │   │   ├── base_page.py
 │   │   ├── settings/
 │   │   ├── calendar/
+│   │   ├── contacts/
 │   │   ├── messages/
 │   │   └── maps/
 │   └── utils/                    # App lifecycle, simulator, Appium, artifacts
 ├── tests/
 │   ├── unit/                     # Device-free tests, including page contracts
-│   └── integration/              # Settings, Calendar, Messages, Maps
+│   └── integration/              # Settings, Calendar, Contacts, Messages, Maps
 ├── docs/                         # Messages and Maps test setup/scope
 ├── scripts/inspect_locators.py   # Explicit locator-discovery utility
-├── .github/workflows/tests.yml   # Linux unit/lint/type checks
+├── .github/workflows/            # Python matrix + opt-in Mac simulator smoke
 ├── conftest.py                   # CLI options, fixtures, collection, artifacts
 ├── pyproject.toml                # Dependencies, package and tool configuration
 └── uv.lock
@@ -291,7 +327,7 @@ def test_settings_ready(settings_app: SettingsHomePage) -> None:
     settings_app.assert_home_visually_ready()
 ```
 
-Available app fixtures are `settings_app`, `calendar_home`, `messages_home`,
+Available app fixtures are `settings_app`, `calendar_home`, `calendar_draft`, `messages_home`,
 `message_draft`, and `maps_home`. `driver` exposes the raw Appium driver;
 `app_launcher` controls app lifecycle. `restored_wifi` restores radio state and
 skips on simulators. Mark hardware-specific tests with
@@ -342,9 +378,15 @@ uv run pytest
 uv build
 ```
 
-CI runs on Linux for pushes and pull requests. It installs with
-`uv sync --locked --no-editable`, then runs Ruff lint/format checks, Pyright, and
-`tests/unit`. Simulator/device tests run locally on macOS.
+CI runs on Linux for pushes and pull requests using Python 3.10 and 3.12. It installs
+with `uv sync --locked --no-editable`, then runs Ruff, Pyright, and unit tests with
+branch coverage, HTML, and JUnit reports. Coverage is reported without an arbitrary
+minimum until a baseline is established.
+
+A separate manual/nightly workflow runs the six smoke tests serially on a provisioned
+Mac runner. Nightly execution requires `ENABLE_SIMULATOR_CI=true`; adding the workflow
+does not register a runner. See [CI setup](docs/ci.md) for labels, toolchain, simulator,
+and artifact requirements.
 
 Runtime dependencies are Appium's Python client and Selenium; pytest, plugins,
 Ruff, and Pyright are development dependencies. `uv sync --no-dev` installs only
