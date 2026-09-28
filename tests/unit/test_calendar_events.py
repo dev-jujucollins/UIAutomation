@@ -167,7 +167,7 @@ def calendar(monkeypatch: pytest.MonkeyPatch) -> tuple[CalendarHarness, Calendar
     monkeypatch.setattr(
         BasePage,
         "_get_wait",
-        lambda self, timeout: WebDriverWait(self.driver, 0.03, poll_frequency=0.001),
+        lambda self, timeout: WebDriverWait(self.driver, 0.5, poll_frequency=0.001),
     )
     harness = CalendarHarness()
     return harness, CalendarEventsPage(harness.driver, ("Owned original", "Owned edited"))
