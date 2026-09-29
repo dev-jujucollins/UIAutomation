@@ -10,6 +10,8 @@ from uuid import uuid4
 
 import pytest
 from appium.webdriver.webdriver import WebDriver
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.support.ui import WebDriverWait
 
 from uiautomation.drivers.ios_driver import IOSDriver, IOSDriverConfig, SystemApps
 from uiautomation.pages.calendar import CalendarHomePage, CalendarOnboardingPage, NewEventPage
@@ -29,6 +31,7 @@ from uiautomation.utils.simulator_control import get_preferred_simulator
 RUN_DIRECTORY = pytest.StashKey[Path]()
 ACTIVE_DRIVER = pytest.StashKey[WebDriver]()
 RUN_REPORT = pytest.StashKey[RunReport]()
+APPLE_PARK_COORDINATES = (37.3349, -122.00902)
 
 
 def pytest_addoption(parser):
@@ -43,6 +46,11 @@ def pytest_addoption(parser):
         "--run-lifecycle",
         action="store_true",
         help="Enable owned-data lifecycle tests on an explicitly named simulator",
+    )
+    parser.addoption(
+        "--run-maps-navigation",
+        action="store_true",
+        help="Enable Maps navigation from the Apple Park location used by all Maps tests",
     )
     parser.addoption(
         "--restart-simulator",
@@ -439,12 +447,22 @@ def pytest_runtest_makereport(item, call):
 def maps_home(
     request: pytest.FixtureRequest, is_simulator: bool
 ) -> Generator[MapsPage, None, None]:
-    """Own Maps UI and location permission on the selected simulator."""
+    """Use Apple Park for each Maps test and restore simulator state afterward."""
     if not is_simulator:
         pytest.skip("Maps coverage requires a simulator")
     driver: WebDriver = request.getfixturevalue("driver")
     launcher: AppLauncher = request.getfixturevalue("app_launcher")
     udid = driver.capabilities["udid"]
+    page: MapsPage | None = None
+
+    def clear_location() -> None:
+        subprocess.run(
+            ["xcrun", "simctl", "location", udid, "clear"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
 
     def reset_permission() -> None:
         subprocess.run(
@@ -454,17 +472,54 @@ def maps_home(
             text=True,
             timeout=30,
         )
+        if page is not None:
+            active_page = page
+            try:
+                WebDriverWait(driver, 3, poll_frequency=0.2).until(
+                    lambda _: active_page.dismiss_known_onboarding("deny")
+                )
+            except TimeoutException:
+                pass
 
+    request.addfinalizer(clear_location)
     request.addfinalizer(reset_permission)
     request.addfinalizer(lambda: launcher.terminate(SystemApps.MAPS))
     launcher.terminate(SystemApps.MAPS)
     reset_permission()
+    latitude, longitude = APPLE_PARK_COORDINATES
+    subprocess.run(
+        ["xcrun", "simctl", "location", udid, "set", f"{latitude},{longitude}"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
     launcher.launch(SystemApps.MAPS)
     page = MapsPage(driver)
     permission = getattr(request, "param", "deny")
     if permission not in ("allow", "deny"):
         raise ValueError("Maps permission must be allow or deny")
-    page.wait_for_visible((page.By.ACCESSIBILITY_ID, "Allow “Maps” to use your location?"))
     page.wait_until_ready(permission)
     request.addfinalizer(page.close_to_home)
     yield page
+
+
+@pytest.fixture
+def maps_navigation_guard(request: pytest.FixtureRequest, is_simulator: bool) -> None:
+    """Require explicit opt-in and simulator selection before starting guidance."""
+    if not request.config.getoption("--run-maps-navigation"):
+        pytest.skip("Maps navigation test requires --run-maps-navigation")
+    if not is_simulator:
+        pytest.skip("Maps navigation test requires a simulator")
+    if request.config.getoption("--device-name") is None:
+        raise pytest.UsageError("Maps navigation test requires --device-name")
+
+
+@pytest.fixture
+def apple_park_maps(
+    request: pytest.FixtureRequest, maps_navigation_guard: None, maps_home: MapsPage
+) -> MapsPage:
+    """Recenter at the shared Apple Park location and own navigation cleanup."""
+    request.addfinalizer(maps_home.end_navigation)
+    maps_home.recenter_at_apple_park()
+    return maps_home

@@ -31,6 +31,7 @@ dev = [
     "ruff>=0.1.0",
     "pyright>=1.1.390",
     "pytest-cov>=7.1.0",
+    "pytest-sugar>=1.1.1",
 ]
 
 [tool.ruff]
@@ -55,6 +56,7 @@ markers = [
     "real_device(reason): Requires a physical device; skip before fixture setup",
     "journey: Representative navigation round trips",
     "lifecycle: Tests creating and deleting owned data on an explicitly selected simulator",
+    "maps_navigation: Starts navigation from Apple Park on an explicitly selected simulator",
     "unit: Tests requiring no device or Appium server",
     "integration: Tests requiring an iOS target",
     "diagnostic: Environment-dependent observations",
@@ -70,11 +72,12 @@ markers = [
     "slow: Tests that take a long time to run",
     "onboarding: Tests for first-time app launch onboarding screens",
 ]
-log_cli = true
+log_cli = false
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)s] %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
-addopts = "-v --tb=short --strict-markers"
+addopts = "-ra --tb=short --strict-markers"
+console_output_style = "classic"
 timeout = 120
 
 [tool.coverage.run]

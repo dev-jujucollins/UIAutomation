@@ -1,6 +1,8 @@
 """Tests for pytest support."""
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -9,6 +11,80 @@ pytest_plugins = ["pytester"]
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_sugar_progress_and_plain_output_fallback(tmp_path: Path) -> None:
+    """Sugar shows progress while captured output stays readable."""
+    probe = tmp_path / "test_color.py"
+    probe.write_text(
+        "def test_failure(): assert False\ndef test_pass_after_failure(): assert True\n"
+    )
+    sugar = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-c",
+            str(ROOT / "pyproject.toml"),
+            "--color=yes",
+            "--force-sugar",
+            str(probe),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert sugar.returncode == 1
+    assert "pytest-sugar" in sugar.stdout
+    assert "50% █" in sugar.stdout
+    assert "100% █" in sugar.stdout
+    assert "⨯✓" in sugar.stdout
+    assert sugar.stdout.index("test_failure ―") < sugar.stdout.index("50% █")
+
+    plain = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-c",
+            str(ROOT / "pyproject.toml"),
+            "--color=yes",
+            str(probe),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert plain.returncode == 1
+    progress_line = next(
+        line
+        for line in plain.stdout.splitlines()
+        if "\x1b[31mF\x1b[0m" in line and "\x1b[32m.\x1b[0m" in line
+    )
+    assert "\x1b[31m" not in progress_line.split("\x1b[32m.\x1b[0m", 1)[1]
+    assert "test_pass_after_failure PASSED" not in plain.stdout
+
+    verbose = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-c",
+            str(ROOT / "pyproject.toml"),
+            "--color=yes",
+            "-v",
+            str(probe),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert verbose.returncode == 1
+    pass_line = next(
+        line for line in verbose.stdout.splitlines() if "test_pass_after_failure " in line
+    )
+    assert "\x1b[32mPASSED\x1b[0m" in pass_line
+    assert "\x1b[31m" not in pass_line
 
 
 @pytest.fixture

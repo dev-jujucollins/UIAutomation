@@ -11,11 +11,13 @@ Runtime code lives in `src/uiautomation/`; tests use pytest.
 | Calendar | `com.apple.mobilecal` | Onboarding, verified date navigation, owned draft cleanup, calendar lists, and opt-in saved-event lifecycle |
 | Contacts | `com.apple.MobileAddressBook` | Opt-in create, relaunch, exact-name search, Unicode editing, deletion, and cleanup |
 | Messages | `com.apple.MobileSMS` | Home, compose/cancel, recipient text, plain/Unicode/multiline drafts, discard, and seeded-conversation navigation |
-| Maps | `com.apple.Maps` | Location allow/deny, search editing, landmark details, Directions entry, and driving/walking route previews |
+| Maps | `com.apple.Maps` | Apple Park simulated location by default, location allow/deny, search editing, driving/walking previews, and opt-in guidance |
 
-Messages tests do not send messages. Maps tests do not start navigation; route
-previews use explicit coordinates through the native Maps URL handler. Manual
-origin editing and real GPS behavior are outside current automated coverage.
+Messages tests do not send messages. Every Maps test temporarily sets the simulator
+location to Apple Park, Cupertino. Route previews still use explicit coordinates
+through the native Maps URL handler. An opt-in case starts and ends turn-by-turn
+guidance from My Location. Manual origin editing,
+real movement, and rerouting are outside current automated coverage.
 Other apps listed in `SystemApps` have bundle identifiers, not implemented test suites.
 
 Saved-data journeys require `--run-lifecycle` and an explicitly named simulator.
@@ -94,6 +96,11 @@ uv run pytest tests/unit -n 2
 uv run pytest --html=report.html --self-contained-html
 ```
 
+In an interactive terminal, pytest-sugar shows a progress bar, pass/fail
+symbols, and failures as they happen. Piped output and CI use pytest's compact
+text output. Add `-v` to see each test name and result, or `-p no:sugar` to use
+plain pytest output. For live logs while debugging, add `-o log_cli=true`.
+
 The HTML command above reports unit tests. Add integration selection and target
 options when generating a device-test report.
 
@@ -143,6 +150,10 @@ uv run pytest --run-integration -m messages \
 # All Maps cases
 uv run pytest --run-integration -m maps \
   --platform-version 27.0 --timeout=300
+
+# Start guidance from the default Apple Park location, then end the route
+uv run pytest --run-integration --run-maps-navigation -m maps_navigation \
+  --device-name "UIAutomation Maps" --platform-version 27.0 --timeout=600
 
 # Cross-app navigation journeys, without opening Device Hub
 uv run pytest --run-integration -m journey --headless-simulator \
@@ -207,9 +218,9 @@ Per-app cleanup has additional rules:
 - Settings Wi-Fi mutation fixtures restore the initial radio state.
 - Messages clears only the test-owned compose draft before cancellation; existing
   conversation drafts are preserved.
-- Maps uses the selected simulator, resets location authorization before each
-  test, answers the prompt, dismisses owned cards, terminates Maps, and resets location
-  authorization on teardown. Searches can remain in Recents.
+- Maps sets the selected simulator's location to Apple Park before each test,
+  handles location prompts, dismisses owned cards, terminates Maps, and clears
+  the simulated location and authorization on teardown. Searches can remain in Recents.
 
 `--skip-simulator-state-reset` or `--no-reset` skips the session-level Settings/Calendar
 reset. Neither disables app fixture cleanup or Maps' per-test permission resets.
@@ -249,6 +260,7 @@ Maps accepts the same selected simulator as the other app fixtures; no special n
 | `--run-integration` | off | Enable device tests |
 | `--run-diagnostics` | off | Include diagnostic cases; device cases still need `--run-integration` |
 | `--run-lifecycle` | off | Enable owned-data journeys on an explicitly named simulator |
+| `--run-maps-navigation` | off | Start guidance in the Apple Park route case; requires an explicitly named simulator |
 | `--device-name` | auto | Exact simulator name; physical-device name when `--udid` is supplied |
 | `--platform-version` | auto | Exact simulator runtime; provide actual OS version for physical devices |
 | `--appium-server` | `http://localhost:4723` | Appium endpoint |

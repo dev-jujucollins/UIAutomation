@@ -1,4 +1,4 @@
-"""Maps P0 journeys on the selected simulator; navigation never starts."""
+"""Maps journeys on the selected simulator, including Apple Park guidance."""
 
 import pytest
 
@@ -60,3 +60,15 @@ def test_search_repeatability(maps_home: MapsPage) -> None:
     for _ in range(2):
         maps_home.search_place("Golden Gate Bridge San Francisco", "Golden Gate Bridge")
         maps_home.close_to_home()
+
+
+@pytest.mark.maps_navigation
+@pytest.mark.journey
+@pytest.mark.parametrize("maps_home", ["allow"], indirect=True)
+def test_directions_from_apple_park_location(apple_park_maps: MapsPage) -> None:
+    """Start driving guidance from simulated Apple Park to Golden Gate Bridge."""
+    apple_park_maps.search_place("Golden Gate Bridge San Francisco", "Golden Gate Bridge")
+    apple_park_maps.open_directions()
+    assert apple_park_maps.waypoints() == ["My Location", "Golden Gate Bridge"]
+    assert apple_park_maps.valid_summary(apple_park_maps.route_summary())
+    assert apple_park_maps.start_navigation("Golden Gate Bridge")

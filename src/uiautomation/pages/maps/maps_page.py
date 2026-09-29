@@ -14,7 +14,7 @@ from ..base_page import BasePage
 
 
 class MapsPage(BasePage):
-    """Exercise search and route previews without starting navigation."""
+    """Exercise Maps search, route previews, and simulated navigation."""
 
     SEARCH = (BasePage.By.ACCESSIBILITY_ID, "MapsSearchTextField")
     HOME = (BasePage.By.ACCESSIBILITY_ID, "HomeView")
@@ -24,11 +24,35 @@ class MapsPage(BasePage):
     CARD_CLOSE = (BasePage.By.ACCESSIBILITY_ID, "CardButtonTypeClose")
     SEARCH_CLOSE = (BasePage.By.ACCESSIBILITY_ID, "Close")
     SEARCH_SUBMIT = (BasePage.By.ACCESSIBILITY_ID, "Search")
+    SEARCH_SUGGESTIONS = (
+        BasePage.By.IOS_CLASS_CHAIN,
+        '**/XCUIElementTypeButton[`name == "MultiTextView"`]',
+    )
     WAYPOINTS = (BasePage.By.ACCESSIBILITY_ID, "WaypointNameText")
+    RECENTER = (BasePage.By.ACCESSIBILITY_ID, "UserLocationButton")
+    MY_LOCATION = (BasePage.By.ACCESSIBILITY_ID, "My Location")
+    APPLE_PARK_NEARBY = (
+        BasePage.By.IOS_PREDICATE,
+        "type == 'XCUIElementTypeOther' AND label BEGINSWITH 'Apple Park Visitor Center'",
+    )
     ROUTE_SUMMARY = (
         BasePage.By.IOS_CLASS_CHAIN,
         '**/XCUIElementTypeOther[`name == "RoutePlanningCell"`]'
+        '/XCUIElementTypeStaticText[`name BEGINSWITH "TitleLabel-SubtitleLabel"`]',
+    )
+    ROUTE_SUMMARY_LEGACY = (
+        BasePage.By.IOS_CLASS_CHAIN,
+        '**/XCUIElementTypeOther[`name == "RoutePlanningCell"`]'
         '/XCUIElementTypeOther[`name BEGINSWITH "TitleLabel-SubtitleLabel"`]',
+    )
+    STEPS_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "StepsLabel-StepsLabel")
+    NAV_TRAY = (BasePage.By.ACCESSIBILITY_ID, "NavTray")
+    NAV_MANEUVER = (BasePage.By.ACCESSIBILITY_ID, "NavManeuverSignView")
+    NAV_DESTINATION = (BasePage.By.ACCESSIBILITY_ID, "DefaultLabel")
+    NAV_GRABBER = (BasePage.By.ACCESSIBILITY_ID, "Card grabber")
+    END_ROUTE = (
+        BasePage.By.IOS_PREDICATE,
+        "type == 'XCUIElementTypeButton' AND label == 'End Route'",
     )
     MODES = {"drive": "DriveButton", "walk": "WalkButton"}
     NETWORK_TIMEOUT = 45
@@ -52,6 +76,8 @@ class MapsPage(BasePage):
             title = alert.get_attribute("name") or ""
             if title == "Allow “Maps” to use your location?":
                 button = "Allow While Using App" if permission == "allow" else "Don’t Allow"
+            elif title == "Allow widgets from “Maps” to use your location?":
+                button = "Allow" if permission == "allow" else "Don’t Allow"
             elif title == "“Maps” Would Like to Send You Notifications":
                 button = "Don’t Allow"
             elif title == "Getting There Safely":
@@ -60,13 +86,18 @@ class MapsPage(BasePage):
                 raise AssertionError(f"Unexpected Maps alert: {title}")
             alert.find_element(self.By.ACCESSIBILITY_ID, button).click()
             return True
-        for heading, button in (
-            ("Get Notified When Friends Share Their ETAs", "Not Now"),
-            ("EnrichmentWarmingSheetGraphic_Light", "Continue"),
+        for heading, buttons in (
+            ("Get Notified When Friends Share Their ETAs", ("Dismiss", "Not Now")),
+            ("EnrichmentWarmingSheetGraphic_Light", ("Continue",)),
+            ("Choose Your Route Options", ("xmark.circle.fill",)),
         ):
             if self._visible((self.By.ACCESSIBILITY_ID, heading)):
-                self.driver.find_element(self.By.ACCESSIBILITY_ID, button).click()
-                return True
+                for button in buttons:
+                    control = self._visible((self.By.ACCESSIBILITY_ID, button))
+                    if control:
+                        control.click()
+                        return True
+                raise AssertionError(f"Known Maps sheet has no dismiss control: {heading}")
         return False
 
     def ready_control(
@@ -85,6 +116,12 @@ class MapsPage(BasePage):
         """Require a home card and usable search field."""
         self.ready_control(self.HOME, permission)
         self.ready_control(self.SEARCH, permission)
+
+    def recenter_at_apple_park(self) -> None:
+        """Center the map on simulated location and require nearby Apple Park."""
+        self.ready_control(self.RECENTER, "allow").click()
+        self.ready_control(self.MY_LOCATION, "allow")
+        self.ready_control(self.APPLE_PARK_NEARBY, "allow")
 
     def query(self) -> str:
         """Read query, normalizing UIKit placeholder values."""
@@ -108,7 +145,29 @@ class MapsPage(BasePage):
     def search_place(self, query: str, expected_name: str) -> None:
         """Submit a specific query and require its expected place card."""
         self.edit_search(query)
-        self.ready_control(self.SEARCH_SUBMIT).click()
+
+        def submit(_: object) -> WebElement | None:
+            if self.dismiss_known_onboarding():
+                return None
+            keyboard_search = self._visible(self.SEARCH_SUBMIT)
+            if keyboard_search:
+                return keyboard_search
+            for suggestion in self.driver.find_elements(*self.SEARCH_SUGGESTIONS):
+                try:
+                    if not suggestion.is_displayed():
+                        continue
+                    label = suggestion.get_attribute("label")
+                except StaleElementReferenceException:
+                    continue
+                if (
+                    isinstance(label, str)
+                    and label.startswith(f"{expected_name},")
+                    and "Search Nearby" not in label
+                ):
+                    return suggestion
+            return None
+
+        cast(WebElement, self._get_wait(self.NETWORK_TIMEOUT).until(submit)).click()
         self.assert_place(expected_name)
 
     def assert_place(self, expected_name: str) -> None:
@@ -167,11 +226,34 @@ class MapsPage(BasePage):
 
         def summary(_: object) -> str | bool:
             self.dismiss_known_onboarding()
-            element = self._visible(self.ROUTE_SUMMARY)
-            label = element.get_attribute("label") if element else None
-            return label if isinstance(label, str) and self.valid_summary(label) else False
+            for locator in (self.ROUTE_SUMMARY, self.ROUTE_SUMMARY_LEGACY):
+                element = self._visible(locator)
+                label = element.get_attribute("label") if element else None
+                if isinstance(label, str) and self.valid_summary(label):
+                    return label
+            return False
 
         return str(self._get_wait(self.NETWORK_TIMEOUT).until(summary))
+
+    def start_navigation(self, destination: str) -> str:
+        """Start simulated guidance and require a maneuver and destination tray."""
+        self.ready_control(self.STEPS_BUTTON).click()
+        self.ready_control(self.NAV_TRAY)
+        tray_label = self.ready_control(self.NAV_DESTINATION).get_attribute("label")
+        assert isinstance(tray_label, str) and tray_label.startswith(f"To {destination},"), (
+            tray_label
+        )
+        maneuver = self.ready_control(self.NAV_MANEUVER).get_attribute("label")
+        assert isinstance(maneuver, str) and maneuver.strip(), maneuver
+        return maneuver
+
+    def end_navigation(self) -> None:
+        """End a test-started route through Maps' own End Route control."""
+        if not self._visible(self.NAV_TRAY):
+            return
+        self.ready_control(self.NAV_GRABBER).click()
+        self.ready_control(self.END_ROUTE).click()
+        self.ready_control(self.PLACE)
 
     def select_mode(self, mode: Literal["drive", "walk"]) -> str:
         """Switch route mode and require its selected state and valid route data."""
