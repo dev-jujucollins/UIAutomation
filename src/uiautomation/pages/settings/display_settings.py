@@ -3,6 +3,7 @@ Settings App - Display & Brightness Settings Page Object
 """
 
 from appium.webdriver.webdriver import WebDriver
+from selenium.common.exceptions import StaleElementReferenceException
 
 from ..base_page import BasePage
 
@@ -190,15 +191,18 @@ class DisplaySettingsPage(BasePage):
 
         Returns:
             Brightness level between 0.0 and 1.0.
+
+        Raises:
+            ValueError: The slider value is missing, invalid, or out of range.
         """
         value = self.get_attribute(self.BRIGHTNESS_SLIDER, "value")
-        if value:
-            # Value comes as percentage string like "50%"
-            try:
-                return float(value.replace("%", "")) / 100
-            except ValueError:
-                return 0.5
-        return 0.5
+        try:
+            level = float(value.strip().removesuffix("%")) / 100 if value else None
+        except ValueError as error:
+            raise ValueError(f"Invalid brightness slider value: {value!r}") from error
+        if level is None or not 0 <= level <= 1:
+            raise ValueError(f"Invalid brightness slider value: {value!r}")
+        return level
 
     def set_brightness_level(self, level: float) -> None:
         """
@@ -206,9 +210,13 @@ class DisplaySettingsPage(BasePage):
 
         Args:
             level: Brightness level between 0.0 and 1.0.
+
+        Raises:
+            ValueError: The target or reported slider value is invalid.
+            TimeoutException: The slider does not reach the target within 5 percentage points.
         """
-        # Clamp value between 0 and 1
-        level = max(0.0, min(1.0, level))
+        if not 0 <= level <= 1:
+            raise ValueError("Brightness must be between 0 and 1")
 
         slider = self.find_element(self.BRIGHTNESS_SLIDER)
 
@@ -223,6 +231,14 @@ class DisplaySettingsPage(BasePage):
 
         # Tap at target position
         self.driver.execute_script("mobile: tap", {"x": target_x, "y": y})
+
+        def reached_level(_: WebDriver) -> bool:
+            try:
+                return abs(self.get_brightness_level() - level) <= 0.05
+            except StaleElementReferenceException:
+                return False
+
+        self._get_wait(None).until(reached_level, f"Brightness did not reach {level:.0%}")
 
     # -------------------------------------------------------------------------
     # True Tone

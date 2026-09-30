@@ -6,6 +6,7 @@ import logging
 import subprocess
 from collections.abc import Generator
 from pathlib import Path
+from time import time
 from uuid import uuid4
 
 import pytest
@@ -31,6 +32,7 @@ from uiautomation.utils.simulator_control import get_preferred_simulator
 RUN_DIRECTORY = pytest.StashKey[Path]()
 ACTIVE_DRIVER = pytest.StashKey[WebDriver]()
 RUN_REPORT = pytest.StashKey[RunReport]()
+TEST_STARTED = pytest.StashKey[float]()
 APPLE_PARK_COORDINATES = (37.3349, -122.00902)
 
 
@@ -421,6 +423,26 @@ def pytest_runtest_makereport(item, call):
             else item.config.stash[RUN_DIRECTORY] / "appium.log"
         )
         try:
+            crash_context = None
+            capabilities = getattr(driver, "capabilities", {})
+            udid = (
+                capabilities.get("udid", capabilities.get("appium:udid"))
+                if isinstance(capabilities, dict)
+                else None
+            )
+            udid = udid or getattr(driver_config, "udid", None)
+            apps = {
+                "calendar": "com.apple.mobilecal",
+                "settings": "com.apple.Preferences",
+                "maps": "com.apple.Maps",
+                "messages": "com.apple.MobileSMS",
+                "contacts": "com.apple.MobileAddressBook",
+            }
+            if isinstance(udid, str) and not item.config.getoption("--udid"):
+                for marker, bundle in apps.items():
+                    if item.get_closest_marker(marker):
+                        crash_context = (udid, bundle, item.stash.get(TEST_STARTED, call.start))
+                        break
             destination = capture_failure(
                 item.config.stash[RUN_DIRECTORY],
                 item.nodeid,
@@ -428,6 +450,7 @@ def pytest_runtest_makereport(item, call):
                 driver,
                 log_path,
                 str(report.longrepr),
+                simulator_crash=crash_context,
             )
             report.sections.append(("Failure artifacts", str(destination)))
             report.user_properties.append(("failure_artifacts", str(destination)))
@@ -441,6 +464,18 @@ def pytest_runtest_makereport(item, call):
                 ]
         except Exception:
             logging.getLogger(__name__).exception("Unable to save failure artifacts")
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    """Bound crash evidence to this test, including fixture setup."""
+    item.stash[TEST_STARTED] = time()
+
+
+@pytest.hookimpl(optionalhook=True)
+def pytest_xdist_node_collection_finished(node, ids: list[str]) -> None:
+    """Keep controller selection metadata when workers own collection."""
+    node.config.stash[RUN_REPORT].record_selection(ids)
 
 
 @pytest.fixture

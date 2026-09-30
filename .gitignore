@@ -39,6 +39,7 @@ env/
 .coverage.*
 htmlcov/
 reports/
+report_output/
 .tox/
 .nox/
 

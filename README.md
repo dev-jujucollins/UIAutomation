@@ -1,7 +1,30 @@
 # UIAutomation
 
-Python/Appium framework for testing native iOS apps with XCUITest and page objects.
-Runtime code lives in `src/uiautomation/`; tests use pytest.
+Python/Appium framework for testing native iOS apps with XCUITest, pytest, and page
+objects. Device-free unit tests cover framework behavior; serial device tests
+exercise Settings, Calendar, Contacts, Messages, and Maps.
+
+The `uiautomation` CLI checks local setup, runs test presets with optional email
+summaries, and compares saved runs. Failures collect screenshots, page XML, Appium
+logs, and matching simulator crash reports when available.
+
+## Quick start
+
+From the repository root:
+
+```bash
+uv sync
+uv run pytest                         # Device-free unit tests
+uv run uiautomation doctor --platform-version 27.0
+
+# After installing the iOS toolchain described below
+uv run uiautomation smoke --platform-version 27.0 --timeout=300
+```
+
+For email delivery after a smoke run, configure the sender as described under
+[local email summaries](#local-email-summaries), then add `--email`.
+Device tests can start a local Appium server automatically or reuse one already
+running. A dedicated Mac CI runner is optional; local runs use the same tests.
 
 ## Current coverage
 
@@ -86,6 +109,75 @@ Do not create duplicates if these names already exist. Check inventory with
 
 ## Run tests
 
+### Local presets
+
+The CLI provides five presets. It retains pytest's terminal output and exit status
+and saves each invocation under its own `artifacts/local-<id>/` directory.
+
+```bash
+uv run uiautomation unit
+uv run uiautomation integration --platform-version 27.0 --timeout=300
+uv run uiautomation all --platform-version 27.0 --timeout=300
+uv run uiautomation smoke --platform-version 27.0 --timeout=300
+uv run uiautomation journey --platform-version 27.0 --timeout=300
+```
+
+`unit` selects `tests/unit`; `integration` selects `tests/integration`; `all`
+selects both unit and integration tests. `smoke` selects integration smoke checks; `journey`
+selects integration journeys excluding saved-data and Maps guidance cases.
+All device presets enable integration execution. Diagnostics, saved-data lifecycle,
+and Maps guidance still require their explicit opt-in flags and applicable target setup.
+Common options work directly: `--device-name`, `--platform-version`, `--timeout`,
+`--headless-simulator`, device/signing options, reset and opt-in flags, `-m`, `-k`,
+`-v`, and `-q`. Use `--` for other pytest arguments:
+
+```bash
+uv run uiautomation integration --email --device-name "UIAutomation CI" \
+  --platform-version 27.0 --timeout=600 -- --maxfail=1
+```
+
+Runner options such as `--email`, `--email-preview`, `--email-config`, and
+`--artifacts-dir` belong before `--`. Existing `uiautomation run --suite NAME`
+commands remain supported with the same options. Direct `uv run pytest` commands
+remain available for individual tests, markers, and opt-in cases.
+
+### Local email summaries
+
+Email is opt-in for each CLI run. Configure it once on the Mac:
+
+1. Copy `email.example.json` to `email.local` and fill in the SMTP host, port,
+   security mode (`starttls` or `ssl`), username, sender, and recipient.
+2. In Keychain Access, create a generic password named `uiautomation.smtp` in
+   the login keychain. Set Account to exactly the configured username and Password
+   to the provider's SMTP password or app password.
+
+`email.local` is ignored by Git. Passwords stay in Keychain. The sender supports
+SMTP username/password authentication over TLS; OAuth-only services need a separate
+integration.
+
+```bash
+# Generate HTML and preview a summary without SMTP or Keychain access
+uv run uiautomation unit --email-preview
+
+# Email one summary after a smoke run, including failed runs
+uv run uiautomation smoke --email \
+  --platform-version 27.0 --timeout=300
+
+# Full regular integration suite with email and HTML attachment
+uv run uiautomation integration --email \
+  --platform-version 27.0 --timeout=300
+```
+
+Summaries contain test counts, failures, duration, target, and commit. Email runs
+automatically generate a self-contained `report.html` and attach it. Previews
+generate the same report without sending. The HTML includes pytest results and
+captured output; screenshot, XML, crash, and Appium log files remain local.
+Their links need the local artifact folder. Missing reports or reports over 10 MB
+fall back to summary-only delivery. Delivery failures preserve pytest's exit status
+and save `email-status.json` alongside `email.txt`. Plain `uv run pytest` does not
+send email. See [reporting](docs/reporting.md#opt-in-local-email) for setup and
+delivery details.
+
 ### Unit tests
 
 Default pytest runs exclude integration tests and opt-in diagnostics:
@@ -168,7 +260,7 @@ uv run pytest --run-integration \
   tests/integration/test_settings.py::TestSettingsNavigation::test_settings_app_launches \
   --device-name "iPhone 17 Pro" --platform-version 27.0 --timeout=300
 
-# Opt-in Calendar observations
+# Opt-in Calendar and Wi-Fi observations (Wi-Fi requires hardware)
 uv run pytest --run-integration --run-diagnostics -m diagnostic --timeout=300
 ```
 
@@ -177,6 +269,12 @@ Messages discard/conversation round trips, and Maps Directions/route/repeated-se
 flows. App markers can be combined with `smoke` or `journey` using pytest expressions.
 Selecting `regression` is not a substitute for running `tests/integration`; the
 registered marker does not automatically mark every integration test.
+
+Calendar event-date observations and Wi-Fi discovery/connection checks are
+diagnostics, excluded unless `--run-diagnostics` is supplied. They can accept an
+empty environment; their results do not establish event or network correctness.
+The regular suite verifies Calendar title editing and cancellation in one draft
+journey, and reads device name, OS version, and model in one visit to About.
 
 See [Messages testing](docs/messages-testing.md) for seed-data assumptions and
 [Maps testing](docs/maps-testing.md) for exact assertions and coverage boundaries.
@@ -216,6 +314,8 @@ For simulator runs, the framework:
 Per-app cleanup has additional rules:
 
 - Settings Wi-Fi mutation fixtures restore the initial radio state.
+  The brightness mutation case verifies the changed slider reading and restores
+  its original value; invalid readings fail instead of returning a fallback.
 - Messages clears only the test-owned compose draft before cancellation; existing
   conversation drafts are preserved.
 - Maps sets the selected simulator's location to Apple Park before each test,
@@ -227,13 +327,28 @@ reset. Neither disables app fixture cleanup or Maps' per-test permission resets.
 `--restart-simulator` takes effect only when session-level reset is enabled.
 
 On failure, hooks write unique directories under `artifacts/<run-id>/` containing
-metadata and, when available, screenshots, page XML, and local Appium logs. Missing
+metadata and, when available, screenshots, page XML, local Appium logs, and recent
+matching simulator `.ips` crash reports. Crash capture is bounded and excludes
+old or unrelated reports. Missing
 captures are recorded in metadata. External servers must supply logs separately.
 Use `--artifacts-dir PATH` to change the output root.
 
-Every executed run also writes `run.json` with commit, tool versions, selected target,
-sanitized capabilities, phase durations, outcomes, and failure artifact locations.
-HTML reports link to available evidence. See [reporting](docs/reporting.md).
+Every executed run also writes `run.json` with commit and checkout status, selected
+test names, sanitized execution options and capabilities, tool versions, selected
+target, phase durations, outcomes, and failure artifact locations. Parameter values
+are omitted from recorded test names. HTML reports link to available evidence.
+
+Compare completed local runs to find recurring failures and slow setup:
+
+```bash
+uv run uiautomation history --limit 15
+uv run uiautomation history --json
+```
+
+History groups tests by target and runtime, reports median total/setup durations,
+and flags mixed outcomes for investigation. It skips unfinished and worker
+manifests and does not retry tests. See [reporting](docs/reporting.md) for artifact
+contents and limits.
 
 Setup subprocesses have bounded timeouts. Pytest defaults to 120 seconds per test;
 examples use 300 seconds to allow setup. A first WebDriverAgent build may require
@@ -308,15 +423,17 @@ UIAutomation/
 │   │   ├── contacts/
 │   │   ├── messages/
 │   │   └── maps/
-│   └── utils/                    # App lifecycle, simulator, Appium, artifacts
+│   ├── utils/                    # Runtime, artifacts, history, SMTP reporting
+│   └── cli.py                    # doctor, run, history commands
 ├── tests/
 │   ├── unit/                     # Device-free tests, including page contracts
 │   └── integration/              # Settings, Calendar, Contacts, Messages, Maps
-├── docs/                         # Messages and Maps test setup/scope
+├── docs/                         # Setup, app coverage, reporting, CI
 ├── scripts/inspect_locators.py   # Explicit locator-discovery utility
-├── .github/workflows/            # Python matrix + opt-in Mac simulator smoke
+├── .github/workflows/            # Python matrix + gated Mac smoke/journeys
 ├── conftest.py                   # CLI options, fixtures, collection, artifacts
 ├── pyproject.toml                # Dependencies, package and tool configuration
+├── email.example.json            # Nonsecret SMTP configuration template
 └── uv.lock
 ```
 
@@ -395,10 +512,13 @@ with `uv sync --locked --no-editable`, then runs Ruff, Pyright, and unit tests w
 branch coverage, HTML, and JUnit reports. Coverage is reported without an arbitrary
 minimum until a baseline is established.
 
-A separate manual/nightly workflow runs the six smoke tests serially on a provisioned
-Mac runner. Nightly execution requires `ENABLE_SIMULATOR_CI=true`; adding the workflow
-does not register a runner. See [CI setup](docs/ci.md) for labels, toolchain, simulator,
-and artifact requirements.
+Separate Mac workflows provide nightly smoke checks and weekly navigation journeys
+on a provisioned dedicated runner. Both support manual dispatch; scheduled runs
+require `ENABLE_SIMULATOR_CI=true`. Weekly dispatch can explicitly include saved-data
+and Maps guidance cases. Both workflows share a queue to prevent overlapping device
+sessions. These workflows require a connected Mac runner; local testing and email
+reporting work independently. See [CI setup](docs/ci.md) for provisioning and
+artifact requirements.
 
 Runtime dependencies are Appium's Python client and Selenium; pytest, plugins,
 Ruff, and Pyright are development dependencies. `uv sync --no-dev` installs only

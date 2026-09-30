@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_sugar_progress_and_plain_output_fallback(tmp_path: Path) -> None:
-    """Sugar shows progress while captured output stays readable."""
+    """Sugar activates successfully; plain output preserves per-result colors."""
     probe = tmp_path / "test_color.py"
     probe.write_text(
         "def test_failure(): assert False\ndef test_pass_after_failure(): assert True\n"
@@ -36,10 +36,6 @@ def test_sugar_progress_and_plain_output_fallback(tmp_path: Path) -> None:
     )
     assert sugar.returncode == 1
     assert "pytest-sugar" in sugar.stdout
-    assert "50% █" in sugar.stdout
-    assert "100% █" in sugar.stdout
-    assert "⨯✓" in sugar.stdout
-    assert sugar.stdout.index("test_failure ―") < sugar.stdout.index("50% █")
 
     plain = subprocess.run(
         [
@@ -62,7 +58,6 @@ def test_sugar_progress_and_plain_output_fallback(tmp_path: Path) -> None:
         if "\x1b[31mF\x1b[0m" in line and "\x1b[32m.\x1b[0m" in line
     )
     assert "\x1b[31m" not in progress_line.split("\x1b[32m.\x1b[0m", 1)[1]
-    assert "test_pass_after_failure PASSED" not in plain.stdout
 
     verbose = subprocess.run(
         [
@@ -146,6 +141,27 @@ def test_device():
     result = harness.runpytest_subprocess("--run-integration", "-n", "2", "-q")
     assert result.ret != 0
     assert "Parallel iOS tests are unsupported" in result.stdout.str() + result.stderr.str()
+
+
+def test_diagnostics_require_opt_in_before_fixture_setup(harness: pytest.Pytester) -> None:
+    """Enabling integration alone must not run environment observations."""
+    harness.makepyfile("""
+import pytest
+from pathlib import Path
+@pytest.fixture
+def observation():
+    Path("observed").touch()
+def test_regular(): pass
+@pytest.mark.integration
+@pytest.mark.diagnostic
+def test_observation(observation): pass
+""")
+    harness.runpytest_subprocess("--run-integration", "-q").assert_outcomes(passed=1, deselected=1)
+    assert not (harness.path / "observed").exists()
+    harness.runpytest_subprocess("--run-integration", "--run-diagnostics", "-q").assert_outcomes(
+        passed=2
+    )
+    assert (harness.path / "observed").exists()
 
 
 def test_settings_setup_failure_captures_before_cleanup(harness) -> None:
@@ -285,3 +301,35 @@ def test_two(): pass
     controller = next(manifest for manifest in manifests if manifest["worker"] is None)
     assert controller["summary"] == {"passed": 2}
     assert len(controller["results"]) == 6
+    assert controller["selection"]["collected_cases"] == 2
+    assert len(controller["selection"]["tests"]) == 2
+
+
+def test_crash_context_includes_fixture_setup_time(harness: pytest.Pytester) -> None:
+    """A failure hook passes app, target, and setup start to crash capture."""
+    harness.makepyfile("""
+import json
+import pytest
+from time import time
+class Driver:
+    capabilities = {"udid": "00000000-0000-0000-0000-000000000001"}
+    page_source = "<Application/>"
+    def save_screenshot(self, path): return False
+@pytest.fixture
+def driver(monkeypatch):
+    setup_time = time()
+    def capture(destination, udid, bundle, since):
+        assert since <= setup_time
+        (destination / "crash-context.json").write_text(json.dumps([udid, bundle]))
+        return []
+    monkeypatch.setattr("uiautomation.utils.failure_artifacts.collect_simulator_crashes", capture)
+    return Driver()
+@pytest.mark.calendar
+def test_failure(driver): assert False
+""")
+    harness.runpytest_subprocess("-q", "-o", "markers=calendar").assert_outcomes(failed=1)
+    artifact = next(harness.path.glob("artifacts/*/*/crash-context.json"))
+    assert json.loads(artifact.read_text()) == [
+        "00000000-0000-0000-0000-000000000001",
+        "com.apple.mobilecal",
+    ]

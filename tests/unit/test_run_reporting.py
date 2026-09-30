@@ -12,6 +12,42 @@ from uiautomation.utils import run_reporting
 from uiautomation.utils.run_reporting import RunReport, collect_environment, sanitized_capabilities
 
 
+@pytest.mark.parametrize("status, expected", [("", False), (" M file.py\n?? new.py", True)])
+def test_dirty_state_records_boolean_not_file_names(
+    tmp_path, monkeypatch, status, expected
+) -> None:
+    monkeypatch.setattr(
+        run_reporting.subprocess, "run", Mock(return_value=SimpleNamespace(stdout=status))
+    )
+    assert run_reporting.working_tree_dirty(tmp_path) is expected
+
+
+def test_selection_omits_parameters_external_paths_and_private_options(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(run_reporting, "collect_environment", lambda *_: {})
+    report = RunReport(tmp_path / "run", tmp_path, False, {})
+    options = SimpleNamespace(
+        collectonly=False,
+        run_integration=True,
+        timeout=120,
+        team_id="secret",
+        appium_server="secret-url",
+    )
+    session = SimpleNamespace(
+        config=SimpleNamespace(option=options),
+        items=[
+            SimpleNamespace(nodeid="tests/test_one.py::test_case[secret-token]"),
+            SimpleNamespace(nodeid="../secret-external.py::test_private"),
+        ],
+    )
+    report.pytest_sessionstart(session)
+    report.pytest_collection_finish(session)
+    assert report.manifest["options"] == {"run_integration": True, "timeout": 120}
+    assert report.manifest["selection"]["tests"] == ["tests/test_one.py::test_case"]
+    assert "secret" not in json.dumps(report.manifest)
+
+
 def test_capabilities_use_allowlist_at_every_supported_level() -> None:
     """Unknown fields, secrets, URLs, signing teams and UDIDs must not leak."""
     capabilities = {

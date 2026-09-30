@@ -7,6 +7,19 @@ from unittest.mock import MagicMock
 from uiautomation.utils.failure_artifacts import artifact_links, capture_failure
 
 
+def test_crash_capture_failure_preserves_original_failure(tmp_path: Path, monkeypatch) -> None:
+    def broken(*args):
+        raise OSError("unavailable")
+
+    monkeypatch.setattr("uiautomation.utils.failure_artifacts.collect_simulator_crashes", broken)
+    output = capture_failure(
+        tmp_path, "test", "call", None, None, "original failure", ("id", "app", 0)
+    )
+    metadata = json.loads((output / "failure.json").read_text())
+    assert metadata["failure"] == "original failure"
+    assert "Crash reports: OSError" in metadata["capture_errors"]
+
+
 def test_failed_screenshot_does_not_hide_other_evidence(tmp_path: Path) -> None:
     """A broken screenshot must not prevent XML, logs, or error capture."""
     driver = MagicMock()

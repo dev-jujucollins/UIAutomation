@@ -65,32 +65,16 @@ class TestCalendarAddEvent:
         assert new_event_page.wait_for_invisible(new_event_page.TITLE_FIELD)
         assert home.is_on_calendar_home()
 
-    def test_new_event_fields_visible(self, calendar_draft: NewEventPage):
-        """Verify all expected fields are visible on new event screen."""
-        new_event_page = calendar_draft
-
-        # Title field should be present
-        assert new_event_page.is_element_present(new_event_page.TITLE_FIELD)
-
-        # All-day switch should be present
-        new_event_page.expand_date_time()
-        assert new_event_page.is_element_present(new_event_page.ALL_DAY_SWITCH)
-
-        # Cancel to return
-        new_event_page.tap_cancel()
-
-    def test_set_event_title(self, calendar_draft: NewEventPage):
-        """Test setting an event title."""
-        new_event_page = calendar_draft
-
-        test_title = "Test Meeting"
-        new_event_page.set_title(test_title)
-
-        # Done button should be enabled after setting title
-        assert new_event_page.is_done_enabled()
-
-        # Cancel without saving
-        new_event_page.tap_cancel()
+    @pytest.mark.journey
+    def test_edit_and_cancel_event_draft(self, calendar_draft: NewEventPage) -> None:
+        """Verify title editing and return home without saving the draft."""
+        for title in ("Test Meeting", "Revised Test Meeting"):
+            calendar_draft.set_title(title)
+            assert calendar_draft.get_title() == title, "Draft title did not match"
+        assert calendar_draft.is_done_enabled(), "Edited draft cannot be saved"
+        home = calendar_draft.tap_cancel()
+        assert calendar_draft.wait_for_invisible(calendar_draft.TITLE_FIELD)
+        assert home.is_on_calendar_home(), "Cancel did not restore Calendar home"
 
     def test_toggle_all_day(self, calendar_draft: NewEventPage):
         """Test toggling the All-day switch."""
@@ -173,28 +157,6 @@ class TestCalendarDates:
         # This is informational - may or may not have events
         print(f"Dates with events: {dates}")
         assert isinstance(dates, list)
-
-
-@pytest.mark.calendar
-@pytest.mark.slow
-class TestCalendarEventCreation:
-    """Tests for full event creation workflow."""
-
-    @pytest.mark.real_device(reason="Event draft dismissal returns inconsistent views on simulator")
-    def test_create_event_draft_without_persisting(self, calendar_draft: NewEventPage):
-        """Test event creation flow without leaving persisted data behind."""
-        import uuid
-
-        # Generate unique event title
-        unique_id = str(uuid.uuid4())[:8]
-        event_title = f"AutoTest Event {unique_id}"
-
-        new_event_page = calendar_draft
-        new_event_page.set_title(event_title)
-        assert new_event_page.is_done_enabled()
-
-        calendar_home = new_event_page.tap_cancel()
-        assert calendar_home.is_on_calendar_home()
 
 
 @pytest.mark.calendar

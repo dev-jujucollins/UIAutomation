@@ -14,6 +14,23 @@ from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 
+
+def working_tree_dirty(repository: Path) -> bool | None:
+    """Report tracked/untracked edits without recording filenames or content."""
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=normal"],
+            cwd=repository,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+        return bool(result.stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
 # An allowlist prevents arbitrary provider credentials and personal identifiers
 # from reaching reports, including unknown future capability names.
 PUBLIC_CAPABILITIES = {
@@ -78,6 +95,7 @@ def collect_environment(repository: Path, integration: bool) -> dict[str, Any]:
             tools["xcuitest"] = None
     return {
         "commit": _command_output(["git", "rev-parse", "HEAD"], repository),
+        "working_tree_dirty": working_tree_dirty(repository),
         "python": platform.python_version(),
         "host_platform": platform.system(),
         "packages": packages,
@@ -100,6 +118,7 @@ class RunReport:
         self.manifest: dict[str, Any] = {
             "schema_version": 1,
             "run_id": root.name,
+            "integration": integration,
             "started_at": datetime.now(timezone.utc).isoformat(),
             "target": requested_target,
             "capabilities": {},
@@ -113,6 +132,45 @@ class RunReport:
         self.enabled = True
         self.manifest["environment"] = collect_environment(self.repository, self.integration)
         self.manifest["worker"] = getattr(session.config, "workerinput", {}).get("workerid")
+        options = session.config.option
+        self.manifest["options"] = {
+            name: value
+            for name in (
+                "run_integration",
+                "run_diagnostics",
+                "run_lifecycle",
+                "run_maps_navigation",
+                "headless_simulator",
+                "restart_simulator",
+                "no_reset",
+                "skip_simulator_state_reset",
+                "timeout",
+                "numprocesses",
+            )
+            if isinstance((value := getattr(options, name, None)), (bool, int, float))
+        }
+        self.write()
+
+    def pytest_collection_finish(self, session: Any) -> None:
+        """Record selected repository tests without parameter values or raw CLI text."""
+        self.record_selection([item.nodeid for item in session.items])
+
+    def record_selection(self, nodeids: list[str]) -> None:
+        """Record serial or xdist worker collection without parameter values."""
+        selected = []
+        for raw_nodeid in nodeids:
+            nodeid = raw_nodeid.split("[", 1)[0]
+            filename, _, test_name = nodeid.partition("::")
+            path = (self.repository / filename).resolve()
+            if path.is_relative_to(self.repository.resolve()):
+                selected.append(
+                    f"{path.relative_to(self.repository.resolve()).as_posix()}::{test_name}"
+                )
+        self.manifest["selection"] = {
+            "tests": sorted(set(selected)),
+            "collected_cases": len(nodeids),
+            "parameter_values_omitted": True,
+        }
         self.write()
 
     def set_target(self, name: str, platform_version: str) -> None:

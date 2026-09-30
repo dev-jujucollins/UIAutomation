@@ -8,7 +8,11 @@ from typing import TYPE_CHECKING
 
 from appium.webdriver.webdriver import WebDriver
 from appium.webdriver.webelement import WebElement
-from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+from selenium.common.exceptions import (
+    NoSuchElementException,
+    StaleElementReferenceException,
+    TimeoutException,
+)
 from selenium.webdriver.support.wait import WebDriverWait
 
 from ..base_page import BasePage
@@ -339,7 +343,7 @@ class SettingsHomePage(BasePage):
                 )
                 element.click()
                 return DisplaySettingsPage(self.driver)
-            except Exception:
+            except (NoSuchElementException, StaleElementReferenceException):
                 self.scroll_down()
 
         # Final attempt with wait

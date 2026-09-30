@@ -1,0 +1,74 @@
+name: Simulator journeys
+
+on:
+  workflow_dispatch:
+    inputs:
+      lifecycle:
+        description: Include owned Calendar and Contacts saved-data tests
+        type: boolean
+        default: false
+      navigation:
+        description: Include Maps turn-by-turn guidance
+        type: boolean
+        default: false
+  schedule:
+    - cron: "47 10 * * 0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uiautomation-simulator
+  cancel-in-progress: false
+
+jobs:
+  journeys:
+    if: github.event_name == 'workflow_dispatch' || vars.ENABLE_SIMULATOR_CI == 'true'
+    runs-on: [self-hosted, macOS, ARM64, uiautomation, xcode-27, ios-27]
+    timeout-minutes: 60
+    env:
+      UV_PYTHON: "3.12"
+      UIAUTOMATION_SIMULATOR: UIAutomation CI
+      UIAUTOMATION_RUNTIME: "27.0"
+      INCLUDE_LIFECYCLE: ${{ inputs.lifecycle || false }}
+      INCLUDE_NAVIGATION: ${{ inputs.navigation || false }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --locked --no-editable --python 3.12
+      - name: Check simulator prerequisites
+        run: >-
+          uv run --no-editable uiautomation doctor
+          --device-name "$UIAUTOMATION_SIMULATOR" --platform-version "$UIAUTOMATION_RUNTIME"
+          --headless-simulator
+      - name: Run selected journeys serially
+        shell: bash
+        run: |
+          selection='(journey and not lifecycle and not maps_navigation)'
+          options=()
+          if [[ "$INCLUDE_LIFECYCLE" == 'true' ]]; then
+            selection="$selection or lifecycle"
+            options+=(--run-lifecycle)
+          fi
+          if [[ "$INCLUDE_NAVIGATION" == 'true' ]]; then
+            selection="$selection or maps_navigation"
+            options+=(--run-maps-navigation)
+          fi
+          uv run --no-editable pytest tests/integration --run-integration \
+            -m "$selection" "${options[@]}" -n 0 --headless-simulator \
+            --device-name "$UIAUTOMATION_SIMULATOR" --platform-version "$UIAUTOMATION_RUNTIME" \
+            --timeout=600 --artifacts-dir=artifacts \
+            --junitxml=reports/journeys.xml --html=reports/journeys.html --self-contained-html
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: simulator-journeys-${{ github.run_id }}
+          path: |
+            artifacts/
+            reports/
+          retention-days: 30

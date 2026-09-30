@@ -7,6 +7,12 @@ write reports or probe native tools.
 The manifest records:
 
 - Repository commit, Python and package versions, and host operating system.
+- Working-tree dirty status (`null` when unavailable), including untracked files.
+  Filenames and file contents are not recorded.
+- Selected repository test names and case count, with parameter values omitted.
+  A small allowlist records numeric/boolean execution options; raw command lines,
+  marker expressions, server URLs, signing teams, and credentials are excluded.
+  Selection therefore aids reproduction but is not an exact replay command.
 - Requested and then resolved device name/runtime when a driver config or session
   becomes available. Runs without those fixtures retain the CLI requests, which
   are unset by default; no device is selected just to produce a report.
@@ -47,6 +53,108 @@ Failure capture runs independently for screenshots, XML, and logs. Missing
 evidence is recorded in `failure.json` instead of masking other captures. Setup
 and teardown failures receive evidence too when a driver is available. External
 Appium servers must provide their logs separately.
+
+Local simulator failures also collect up to five recent `.ips` crash reports
+for the marked app and selected simulator. Host reports must contain matching
+simulator identity; reports inside the selected simulator's CrashReporter folder
+are already scoped. Collection starts at test setup, excludes old/unrelated
+reports and files over 10 MB, and limits scanning to two seconds. Late-arriving
+reports may be absent; no crash report does not prove the app did not crash.
+Physical-device and legacy `.crash` reports are not collected. Crash reports are
+linked alongside screenshots and contain unsanitized diagnostic data too.
+
+## Compare runs
+
+```bash
+uv run uiautomation history --artifacts-dir artifacts --limit 15
+uv run uiautomation history --artifacts-dir artifacts --json
+```
+
+The command reads `run.json` files recursively, excludes worker/unfinished/malformed manifests,
+deduplicates run IDs, and groups by test, target kind, device name, and runtime.
+Setup or teardown failures count as failed tests even when the call passed.
+Output ranks recurring failures then median total duration, with setup duration
+shown separately. Mixed passing/failing outcomes flag investigation candidates;
+they do not prove flakiness because code and environment can differ across runs.
+No retries run automatically. Extract multiple CI bundles under one artifact root
+to compare their manifests; keep each run's unique directory name.
+
+## Opt-in local email
+
+Run these commands from the repository root:
+
+```bash
+# Normal run: no email configuration, credentials, or network access for reporting
+uv run uiautomation unit
+
+# Preview: generates report.html and email.txt without contacting an email service
+uv run uiautomation unit --email-preview
+
+# After configuring a sender: one summary per explicitly requested run
+uv run uiautomation smoke --email --platform-version 27.0 --timeout=300
+```
+
+Suites are `unit`, `integration`, `all`, `smoke`, and `journey`. `integration`
+runs the full regular device selection, and `all` includes unit tests as well.
+Both enable integration execution without a marker filter. Diagnostics, saved-data
+lifecycle, and Maps guidance still need explicit opt-in flags; lifecycle and guidance
+also require an explicitly named simulator. The journey preset excludes saved-data
+and Maps navigation cases. For example:
+
+```bash
+uv run uiautomation integration --email --platform-version 27.0 --timeout=300
+uv run uiautomation all --email --platform-version 27.0 --timeout=300
+```
+
+Common device, timeout, marker/name selection, reset, and opt-in options work
+directly after the suite command. Put other pytest arguments after `--`; they
+can override pytest selection. Put runner settings before `--`. Existing
+`uiautomation run --suite NAME` commands remain supported. Plain
+`uv run pytest` never sends these emails.
+
+Each invocation owns `artifacts/local-<id>/`, so email cannot pick up an older
+run's report. Messages include counts, failing test names and phases, elapsed
+time, target, and commit. Parameter values and tracebacks are omitted from the
+summary text. Each email or preview run also generates a self-contained pytest-html
+report at `artifacts/local-<id>/report.html`. Live delivery attaches it as
+`report.html`; no extra pytest flags are needed. An explicit `--html` path after
+`--` is honored, with self-contained assets enabled automatically. Only a report
+created or updated during this invocation can be attached.
+
+The attached report contains pytest details, including captured output and failure
+tracebacks. Screenshot, XML, crash, and Appium log files remain local; HTML evidence
+links work when the report is opened beside the corresponding artifact tree.
+Downloading the attachment alone does not include those files. The summary gives
+the local artifact path. Missing/unreadable reports or reports larger than 10 MB
+are explained in the summary and omitted, so reporting failures can still be emailed.
+If pytest fails before producing a manifest, the email reports its exit status
+without inventing test counts. Collection errors and interrupted runs may have
+incomplete summaries.
+
+### Sender setup
+
+Copy `email.example.json` to `email.local` and fill in your provider's SMTP
+host, port, security mode, username, authorized sender, and recipient.
+`email.local` is ignored by Git. `--email-config PATH` can select another file.
+Use `starttls` for STARTTLS or `ssl` for implicit TLS; unencrypted SMTP is not
+supported. Recipient and sender are single plain addresses.
+
+Store the SMTP password/app password in macOS Keychain as a generic password:
+service/name `uiautomation.smtp`, account matching `username` exactly. Create
+the entry in Keychain Access; do not put the password in the JSON file, shell
+history, or repository. The runner retrieves that entry only after an explicit
+`--email` run. A Keychain access prompt may require approval on first use.
+
+Pytest does not supply an email account. Use an SMTP service that supports
+username/password authentication over TLS. Providers requiring OAuth-only SMTP
+need a separate OAuth integration; this sender does not implement OAuth.
+Any supported sender can deliver to a Hotmail recipient.
+
+Email failures print a warning and save `email-status.json`, but retain pytest's
+exit status. The preview/summary is saved as `email.txt`. SMTP operations have
+timeouts, and delivery is not retried automatically because an ambiguous response
+could otherwise cause duplicate messages. No scheduler or email subscriptions
+are installed.
 
 The capability allowlist applies only to the manifest. Screenshots, page XML,
 tracebacks, and Appium logs are diagnostic content and are not scrubbed; use

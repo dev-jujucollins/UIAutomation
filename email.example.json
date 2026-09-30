@@ -1,0 +1,8 @@
+{
+  "host": "smtp.your-provider.example",
+  "port": 587,
+  "security": "starttls",
+  "username": "your-smtp-username",
+  "sender": "your-sender@example.com",
+  "recipient": "your-recipient@example.com"
+}

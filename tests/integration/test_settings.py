@@ -168,34 +168,34 @@ class TestDisplaySettings:
         assert 0 <= brightness <= 1
         print(f"Current brightness: {brightness * 100}%")
 
+    @pytest.mark.real_device(reason="Brightness controls require hardware")
+    def test_change_and_restore_brightness(self, settings_app: SettingsHomePage) -> None:
+        """Confirm a changed slider value and restore its initial reading."""
+        display_page = settings_app.go_to_display_brightness()
+        original = display_page.get_brightness_level()
+        target = 0.75 if original < 0.5 else 0.25
+        try:
+            display_page.set_brightness_level(target)
+            assert abs(display_page.get_brightness_level() - target) <= 0.05
+        finally:
+            display_page.set_brightness_level(original)
+
 
 @pytest.mark.settings
 class TestGeneralSettings:
     """Tests for General settings."""
 
-    def test_get_device_name(self, settings_app: SettingsHomePage):
-        """Test retrieving device name from About."""
+    def test_about_device_information(self, settings_app: SettingsHomePage) -> None:
+        """Read device identity and OS version in one visit to About."""
         general_page = settings_app.go_to_general()
         about_page = general_page.go_to_about()
 
         device_name = about_page.get_device_name()
 
         assert device_name and device_name.strip(), "Device name missing"
-        print(f"Device name: {device_name}")
-
-    def test_get_ios_version(self, settings_app: SettingsHomePage):
-        """Test retrieving iOS version from About."""
-        general_page = settings_app.go_to_general()
-        about_page = general_page.go_to_about()
-
         ios_version = about_page.get_ios_version()
 
         assert ios_version and re.match(r"^\d+\.\d+", ios_version), "iOS version missing or invalid"
-
-    def test_get_model_name(self, settings_app: SettingsHomePage):
-        """Test retrieving device model name from About."""
-        general_page = settings_app.go_to_general()
-        about_page = general_page.go_to_about()
 
         model_name = about_page.get_model_name()
 

@@ -87,3 +87,13 @@ uv run pytest tests/unit --cov=uiautomation --cov-branch \
   --cov-report=html:reports/coverage \
   --junitxml=reports/unit.xml --html=reports/unit.html --self-contained-html
 ```
+## Weekly simulator journeys
+
+`simulator-journeys.yml` runs Sundays at 10:47 UTC when `ENABLE_SIMULATOR_CI`
+is enabled, using the same dedicated runner labels and `UIAutomation CI` simulator
+as smoke tests. Both workflows share a concurrency group to prevent device overlap.
+Scheduled runs select journeys excluding lifecycle and Maps navigation cases.
+Manual dispatch offers separate `lifecycle` and `navigation` checkboxes, off by
+default; only selecting them enables saved-data or turn-by-turn coverage.
+Journey artifacts remain available for 30 days. The workflow must be pushed to
+GitHub and the dedicated runner connected before these checks can execute.

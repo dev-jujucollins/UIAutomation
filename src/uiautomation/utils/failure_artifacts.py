@@ -10,6 +10,8 @@ from uuid import uuid4
 
 from appium.webdriver.webdriver import WebDriver
 
+from uiautomation.utils.crash_reports import collect_simulator_crashes
+
 
 def artifact_links(destination: Path, report_path: Path) -> list[tuple[str, str]]:
     """Build relocatable links when the HTML and artifact folder move together."""
@@ -27,6 +29,7 @@ def capture_failure(
     driver: WebDriver | None,
     log_path: Path | None,
     failure: str,
+    simulator_crash: tuple[str, str, float] | None = None,
 ) -> Path:
     """Save independent artifacts so one failed capture cannot suppress others."""
     name = re.sub(r"[^\w.-]", "_", nodeid)[-100:]
@@ -52,6 +55,11 @@ def capture_failure(
             errors.append("Appium log unavailable (external servers require local logs)")
     except Exception as error:
         errors.append(f"Appium log: {error}")
+    if simulator_crash is not None:
+        try:
+            errors.extend(collect_simulator_crashes(destination, *simulator_crash))
+        except (OSError, ValueError) as error:
+            errors.append(f"Crash reports: {type(error).__name__}")
     (destination / "failure.json").write_text(
         json.dumps(
             {"nodeid": nodeid, "phase": phase, "failure": failure, "capture_errors": errors},
