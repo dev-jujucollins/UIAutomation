@@ -49,12 +49,12 @@ def test_lifecycle_guard_precedes_data_access(
 ) -> None:
     from unittest.mock import MagicMock
 
-    import conftest
+    from uiautomation import pytest_plugin
 
     request = MagicMock()
     options = {"--run-lifecycle": enabled, "--device-name": device_name}
     request.config.getoption.side_effect = options.__getitem__
-    guard = conftest.lifecycle_simulator.__wrapped__
+    guard = pytest_plugin.lifecycle_simulator.__wrapped__
     if expected == "skip":
         with pytest.raises(pytest.skip.Exception):
             guard(request, simulator)

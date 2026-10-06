@@ -424,14 +424,15 @@ UIAutomation/
 │   │   ├── messages/
 │   │   └── maps/
 │   ├── utils/                    # Runtime, artifacts, history, SMTP reporting
-│   └── cli.py                    # doctor, run, history commands
+│   ├── cli.py                    # doctor, run, history commands
+│   └── pytest_plugin.py          # CLI options, fixtures, collection, artifacts
 ├── tests/
 │   ├── unit/                     # Device-free tests, including page contracts
 │   └── integration/              # Settings, Calendar, Contacts, Messages, Maps
 ├── docs/                         # Setup, app coverage, reporting, CI
 ├── scripts/inspect_locators.py   # Explicit locator-discovery utility
 ├── .github/workflows/            # Python matrix + gated Mac smoke/journeys
-├── conftest.py                   # CLI options, fixtures, collection, artifacts
+├── conftest.py                   # Loads uiautomation.pytest_plugin
 ├── pyproject.toml                # Dependencies, package and tool configuration
 ├── email.example.json            # Nonsecret SMTP configuration template
 └── uv.lock

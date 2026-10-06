@@ -176,6 +176,39 @@ def reset_simulator_app_state(
         )
 
 
+def reset_location_permission(udid: str, bundle_id: str) -> None:
+    """Forget an app's location decision so its permission prompt appears again."""
+    subprocess.run(  # noqa: S603
+        ["xcrun", "simctl", "privacy", udid, "reset", "location", bundle_id],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+
+def set_simulator_location(udid: str, latitude: float, longitude: float) -> None:
+    """Simulate a fixed device location until it is cleared."""
+    subprocess.run(  # noqa: S603
+        ["xcrun", "simctl", "location", udid, "set", f"{latitude},{longitude}"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+
+def clear_simulator_location(udid: str) -> None:
+    """Stop simulating a device location."""
+    subprocess.run(  # noqa: S603
+        ["xcrun", "simctl", "location", udid, "clear"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+
 def open_simulator_app(udid: str) -> None:
     """Open the selected Xcode's Device Hub focused on the target simulator."""
     developer_dir = os.environ.get("DEVELOPER_DIR")

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 from selenium.common.exceptions import TimeoutException
 
-import conftest
+from uiautomation import pytest_plugin
 from uiautomation.pages.messages import ComposeMessagePage, ConversationPage, MessagesHomePage
 
 
@@ -136,7 +136,7 @@ def test_draft_finalizer_is_registered_before_open_failure() -> None:
     request, home = MagicMock(), MagicMock()
     home.open_compose.side_effect = TimeoutException()
     with pytest.raises(TimeoutException):
-        conftest.message_draft.__wrapped__(request, home)
+        pytest_plugin.message_draft.__wrapped__(request, home)
     cleanup = request.addfinalizer.call_args.args[0]
     assert isinstance(cleanup.__self__, ComposeMessagePage)
     assert cleanup.__self__.driver is home.driver
@@ -145,10 +145,10 @@ def test_draft_finalizer_is_registered_before_open_failure() -> None:
 def test_messages_termination_registered_before_launch_failure() -> None:
     request, driver, launcher = MagicMock(), MagicMock(), MagicMock()
     launcher.launch.side_effect = RuntimeError("launch failed")
-    fixture = conftest.messages_home.__wrapped__(request, driver, launcher)
+    fixture = pytest_plugin.messages_home.__wrapped__(request, driver, launcher)
     with pytest.raises(RuntimeError, match="launch failed"):
         next(fixture)
     cleanup = request.addfinalizer.call_args.args[0]
     launcher.terminate.reset_mock()
     cleanup()
-    launcher.terminate.assert_called_once_with(conftest.SystemApps.MESSAGES)
+    launcher.terminate.assert_called_once_with(pytest_plugin.SystemApps.MESSAGES)

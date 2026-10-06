@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 
-import conftest
+from uiautomation import pytest_plugin
 from uiautomation.pages.maps import MapsPage
 
 
@@ -278,8 +278,11 @@ def test_maps_uses_apple_park_on_selected_simulator(
     request.param = permission
     request.getfixturevalue.side_effect = [driver, launcher]
     driver.capabilities = {"udid": "selected-simulator"}
-    with patch("conftest.subprocess.run") as run, patch("conftest.MapsPage") as page_type:
-        fixture = conftest.maps_home.__wrapped__(request, True)
+    with (
+        patch("uiautomation.utils.simulator_control.subprocess.run") as run,
+        patch("uiautomation.pytest_plugin.MapsPage") as page_type,
+    ):
+        fixture = pytest_plugin.maps_home.__wrapped__(request, True)
         assert next(fixture) is page_type.return_value
         page_type.assert_called_once_with(driver)
         page_type.return_value.wait_until_ready.assert_called_once_with(permission)
@@ -313,7 +316,7 @@ def test_maps_uses_apple_park_on_selected_simulator(
 def test_maps_skips_physical_device_before_driver_setup() -> None:
     request = MagicMock()
     with pytest.raises(pytest.skip.Exception):
-        next(conftest.maps_home.__wrapped__(request, False))
+        next(pytest_plugin.maps_home.__wrapped__(request, False))
     request.getfixturevalue.assert_not_called()
 
 
@@ -322,9 +325,9 @@ def test_permission_cleanup_registered_before_launch_failure() -> None:
     request.getfixturevalue.side_effect = [driver, launcher]
     driver.capabilities = {"udid": "test-simulator"}
     launcher.launch.side_effect = RuntimeError("launch failed")
-    with patch("conftest.subprocess.run") as run:
+    with patch("uiautomation.utils.simulator_control.subprocess.run") as run:
         with pytest.raises(RuntimeError, match="launch failed"):
-            next(conftest.maps_home.__wrapped__(request, True))
+            next(pytest_plugin.maps_home.__wrapped__(request, True))
         for finalizer in reversed(request.addfinalizer.call_args_list):
             finalizer.args[0]()
     assert [call.args[0] for call in run.call_args_list] == [
@@ -340,10 +343,10 @@ def test_location_cleanup_registered_before_set_failure() -> None:
     request, driver, launcher = MagicMock(), MagicMock(), MagicMock()
     request.getfixturevalue.side_effect = [driver, launcher]
     driver.capabilities = {"udid": "test-simulator"}
-    with patch("conftest.subprocess.run") as run:
+    with patch("uiautomation.utils.simulator_control.subprocess.run") as run:
         run.side_effect = [None, RuntimeError("set failed"), None, None]
         with pytest.raises(RuntimeError, match="set failed"):
-            next(conftest.maps_home.__wrapped__(request, True))
+            next(pytest_plugin.maps_home.__wrapped__(request, True))
         for finalizer in reversed(request.addfinalizer.call_args_list):
             finalizer.args[0]()
     assert run.call_args_list[-1].args[0] == [
@@ -360,7 +363,7 @@ def test_navigation_skips_before_driver_setup(opt_in: bool, is_simulator: bool) 
     request = MagicMock()
     request.config.getoption.return_value = opt_in
     with pytest.raises(pytest.skip.Exception):
-        conftest.maps_navigation_guard.__wrapped__(request, is_simulator)
+        pytest_plugin.maps_navigation_guard.__wrapped__(request, is_simulator)
     request.getfixturevalue.assert_not_called()
 
 
@@ -370,14 +373,14 @@ def test_navigation_requires_explicit_device() -> None:
         True if option == "--run-maps-navigation" else None
     )
     with pytest.raises(pytest.UsageError, match="--device-name"):
-        conftest.maps_navigation_guard.__wrapped__(request, True)
+        pytest_plugin.maps_navigation_guard.__wrapped__(request, True)
 
 
 def test_navigation_cleanup_registered_before_recenter_fails() -> None:
     request, page = MagicMock(), MagicMock()
     page.recenter_at_apple_park.side_effect = RuntimeError("recenter failed")
     with pytest.raises(RuntimeError, match="recenter failed"):
-        conftest.apple_park_maps.__wrapped__(request, None, page)
+        pytest_plugin.apple_park_maps.__wrapped__(request, None, page)
     for finalizer in reversed(request.addfinalizer.call_args_list):
         finalizer.args[0]()
     page.end_navigation.assert_called_once()
