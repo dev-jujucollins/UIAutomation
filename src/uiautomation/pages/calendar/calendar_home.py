@@ -6,6 +6,8 @@ import re
 from datetime import date
 from typing import TYPE_CHECKING
 
+from selenium.common.exceptions import StaleElementReferenceException
+
 from ..base_page import BasePage
 
 if TYPE_CHECKING:
@@ -214,7 +216,7 @@ class CalendarHomePage(BasePage):
                 name = button.get_attribute("name")
                 if name and isinstance(name, str):
                     dates_with_events.append(name)
-            except Exception:
+            except StaleElementReferenceException:
                 continue
 
         return dates_with_events

@@ -425,81 +425,12 @@ class BasePage:
     # -------------------------------------------------------------------------
 
     def tap_back_button(self) -> None:
-        """Tap the navigation back button."""
-        back_button = (self.By.ACCESSIBILITY_ID, "Back")
-        if self.is_element_present(back_button):
-            self.click(back_button)
+        """Tap the navigation back button.
 
-    def tap_done_button(self) -> None:
-        """Tap a Done button if present."""
-        done_button = (self.By.ACCESSIBILITY_ID, "Done")
-        if self.is_element_present(done_button):
-            self.click(done_button)
-
-    def dismiss_keyboard(self) -> None:
-        """Dismiss the keyboard if present."""
-        try:
-            self.driver.hide_keyboard()
-        except Exception:
-            # Keyboard might not be present
-            pass
-
-    # -------------------------------------------------------------------------
-    # Alert Handling
-    # -------------------------------------------------------------------------
-
-    def accept_alert(self, timeout: int = 5) -> bool:
+        Raises:
+            TimeoutException: If no back button is visible.
         """
-        Accept an alert if present.
-
-        Args:
-            timeout: Time to wait for alert.
-
-        Returns:
-            True if alert was accepted.
-        """
-        try:
-            wait = self._get_wait(timeout)
-            wait.until(expected_conditions.alert_is_present())
-            self.driver.switch_to.alert.accept()
-            return True
-        except TimeoutException:
-            return False
-
-    def dismiss_alert(self, timeout: int = 5) -> bool:
-        """
-        Dismiss an alert if present.
-
-        Args:
-            timeout: Time to wait for alert.
-
-        Returns:
-            True if alert was dismissed.
-        """
-        try:
-            wait = self._get_wait(timeout)
-            wait.until(expected_conditions.alert_is_present())
-            self.driver.switch_to.alert.dismiss()
-            return True
-        except TimeoutException:
-            return False
-
-    def get_alert_text(self, timeout: int = 5) -> str | None:
-        """
-        Get alert text if present.
-
-        Args:
-            timeout: Time to wait for alert.
-
-        Returns:
-            Alert text or None.
-        """
-        try:
-            wait = self._get_wait(timeout)
-            wait.until(expected_conditions.alert_is_present())
-            return self.driver.switch_to.alert.text
-        except TimeoutException:
-            return None
+        self.click((self.By.ACCESSIBILITY_ID, "BackButton"))
 
     # -------------------------------------------------------------------------
     # Screenshot Methods
