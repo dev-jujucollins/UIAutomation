@@ -21,7 +21,6 @@ class CalendarsListPage(BasePage):
     Provides methods to view and manage calendar subscriptions.
     """
 
-    # Locators - iOS 26.3 compatible
     # Navigation
     DONE_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "done-button")
     CALENDARS_TITLE = (
@@ -29,7 +28,7 @@ class CalendarsListPage(BasePage):
         "type == 'XCUIElementTypeStaticText' AND name == 'Calendars'",
     )
 
-    # Calendar cells - iOS 26.3 uses "calendarlist-cell:account:calendar" naming
+    # Calendar cells use "calendarlist-cell:account:calendar" naming
     CALENDAR_CELLS = (
         BasePage.By.IOS_PREDICATE,
         "type == 'XCUIElementTypeCell' AND name CONTAINS 'calendarlist-cell'",

@@ -15,7 +15,7 @@ class GeneralSettingsPage(BasePage):
     About, Software Update, AirDrop, Storage, and more.
     """
 
-    # Locators - iOS 26.3 compatible (uses cell name identifiers)
+    # Locators use cell name identifiers, with labels as a fallback
     ABOUT_CELL = (BasePage.By.ACCESSIBILITY_ID, "About")
     SOFTWARE_UPDATE_CELL = (
         BasePage.By.IOS_PREDICATE,
@@ -71,7 +71,7 @@ class GeneralSettingsPage(BasePage):
     # Shut Down
     SHUT_DOWN_CELL = (BasePage.By.ACCESSIBILITY_ID, "Shut Down")
 
-    # Navigation - iOS 26.3 uses BackButton
+    # Navigation bar back button
     BACK_BUTTON = (
         BasePage.By.IOS_PREDICATE,
         "name == 'BackButton' OR label == 'Settings'",
@@ -212,7 +212,7 @@ class AboutPage(BasePage):
     Provides methods to retrieve device information.
     """
 
-    # Locators - iOS 26.3 compatible (uses cell name identifiers)
+    # Locators use cell name identifiers, with labels as a fallback
     NAME_CELL = (
         BasePage.By.IOS_PREDICATE,
         "name == 'NAME_CELL_ID' OR label CONTAINS 'Name,'",
@@ -243,7 +243,7 @@ class AboutPage(BasePage):
         "name == 'BTMACAddress' OR label CONTAINS 'Bluetooth'",
     )
 
-    # Storage - iOS 26.3 uses uppercase names
+    # Storage cells use uppercase names
     SONGS_CELL = (
         BasePage.By.IOS_PREDICATE,
         "name == 'SONGS' OR label CONTAINS 'Songs'",
@@ -269,7 +269,7 @@ class AboutPage(BasePage):
         "name == 'User Data Available' OR label CONTAINS 'Available'",
     )
 
-    # Navigation - iOS 26.3 uses BackButton
+    # Navigation bar back button
     BACK_BUTTON = (
         BasePage.By.IOS_PREDICATE,
         "name == 'BackButton' OR label == 'General'",
@@ -290,9 +290,9 @@ class AboutPage(BasePage):
 
     def _extract_value_from_label(self, label: str | None) -> str | None:
         """
-        Extract the value part from an iOS 26.3 label.
+        Extract the value part from an About row label.
 
-        iOS 26.3 format: "Field Name, Value" (e.g., "Name, Julius iPhone")
+        Label format: "Field Name, Value" (e.g., "Name, Julius iPhone")
 
         Args:
             label: The full label string.
@@ -313,7 +313,7 @@ class AboutPage(BasePage):
         Returns:
             Device name string.
         """
-        # iOS 26.3: Value is in the label, format "Name, DeviceName"
+        # The value is in the label: "Name, DeviceName"
         label = self.get_attribute(self.NAME_CELL, "label", timeout=5)
         return self._extract_value_from_label(label)
 
@@ -324,7 +324,7 @@ class AboutPage(BasePage):
         Returns:
             iOS version string.
         """
-        # iOS 26.3: format "iOS Version, 26.3"
+        # Label format: "iOS Version, <version>"
         if self.is_element_present(self.IOS_VERSION_CELL, timeout=2):
             label = self.get_attribute(self.IOS_VERSION_CELL, "label")
             return self._extract_value_from_label(label)

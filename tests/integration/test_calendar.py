@@ -169,11 +169,11 @@ class TestCalendarOnboarding:
     is launched for the first time on a fresh device/simulator.
 
     To test on a fresh simulator, erase the simulator first:
-        xcrun simctl erase "iPhone 17 Pro"
+        xcrun simctl erase "iPhone 18 Pro"
 
     Then run:
         uv run pytest --run-integration tests/integration/test_calendar.py::TestCalendarOnboarding -v \
-            --device-name "iPhone 17 Pro" --platform-version "26.2"
+            --device-name "iPhone 18 Pro" --platform-version "27.0"
     """
 
     def test_onboarding_dismissal_reaches_home(self, request, driver, app_launcher: AppLauncher):
