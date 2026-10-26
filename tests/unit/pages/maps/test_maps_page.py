@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+from selenium.webdriver.support.wait import WebDriverWait
 
 from uiautomation import pytest_plugin
 from uiautomation.pages.maps import MapsPage
@@ -238,7 +239,7 @@ def test_wrong_place_cannot_pass_as_expected_landmark() -> None:
 
 def test_failed_mode_selection_cannot_pass_with_old_summary() -> None:
     page = MapsPage(MagicMock())
-    page.DEFAULT_TIMEOUT = 0
+    page._wait = WebDriverWait(page.driver, 0)
     page.ready_control = MagicMock()
     page.find_element = MagicMock()
     page.find_element.return_value.get_attribute.return_value = None
