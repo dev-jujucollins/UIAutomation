@@ -1,6 +1,6 @@
 # Setup and environment diagnostics
 
-Unit tests need only Python 3.10+ and uv. Local iOS integration tests additionally
+Unit tests need only Python 3.12+ and uv. Local iOS integration tests additionally
 need macOS, Xcode 27+, an installed iOS simulator runtime, Node.js, Appium, and the
 XCUITest driver. Install Python dependencies from the checkout:
 

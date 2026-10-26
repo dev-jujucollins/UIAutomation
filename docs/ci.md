@@ -2,12 +2,11 @@
 
 ## Pull requests and pushes
 
-`.github/workflows/tests.yml` runs Linux jobs for Python 3.10 (the minimum
-supported version) and 3.12 (the development version). Each job installs the
-locked, noneditable package, checks Ruff formatting/lint and Pyright, and runs
-device-free unit tests with branch coverage.
-`UV_PYTHON` is set per matrix job so the checkout's `.python-version` cannot
-silently switch the Python 3.10 job back to the development interpreter.
+`.github/workflows/tests.yml` runs a Linux job for Python 3.12, the minimum
+supported and development version. The job installs the locked, noneditable
+package, checks Ruff formatting/lint and Pyright, and runs device-free unit tests
+with branch coverage. `UV_PYTHON` is set per matrix job so a version added to the
+matrix later cannot be silently switched to the checkout's `.python-version`.
 
 Every run uploads `unit-python-<version>` for 14 days, including:
 

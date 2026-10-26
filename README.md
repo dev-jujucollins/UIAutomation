@@ -47,7 +47,7 @@ older runtimes are not a guarantee that these app flows will pass.
 
 ## Requirements
 
-Unit tests need Python 3.10+ and [uv](https://docs.astral.sh/uv/). Device tests also
+Unit tests need Python 3.12+ and [uv](https://docs.astral.sh/uv/). Device tests also
 need macOS with Xcode 27+ and Device Hub, an iPhone simulator or configured physical
 device, Node.js, Appium with the XCUITest driver, and internet access for Maps.
 
@@ -328,7 +328,7 @@ uv run pytest
 uv build
 ```
 
-CI runs Ruff, Pyright, and unit tests with coverage on Linux (Python 3.10 and 3.12)
+CI runs Ruff, Pyright, and unit tests with coverage on Linux (Python 3.12)
 for every push and pull request. Optional Mac workflows run nightly smoke checks and
 weekly journeys on a dedicated runner; see [CI setup](docs/ci.md).
 

@@ -3,7 +3,7 @@ name = "uiautomation"
 version = "0.1.0"
 description = "iOS Native Apps UI Automation Framework using Appium and Python"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "Julius Collins" }]
 
@@ -36,7 +36,7 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
@@ -44,7 +44,7 @@ ignore = ["E501"]
 
 [tool.pyright]
 include = ["src", "conftest.py"]
-pythonVersion = "3.10"
+pythonVersion = "3.12"
 typeCheckingMode = "basic"
 
 [tool.pytest.ini_options]
