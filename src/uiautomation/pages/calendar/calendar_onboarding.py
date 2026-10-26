@@ -10,8 +10,10 @@ class CalendarOnboardingPage(BasePage):
     """
     Page object for Calendar app onboarding prompts.
 
-    Calendar asks for location and notification access on first launch. Both are
-    declined. Any other alert fails the run so new UI is inspected, not tapped through.
+    Calendar asks for location and notification access on first launch, and iOS 27
+    adds a "What’s New in Calendar" sheet. The permissions are declined and the sheet
+    is continued past. Any other alert fails the run so new UI is inspected, not
+    tapped through.
     """
 
     LOCATION_ALERT = (
@@ -28,6 +30,17 @@ class CalendarOnboardingPage(BasePage):
     DONT_ALLOW_BUTTON = (
         BasePage.By.IOS_PREDICATE,
         "type == 'XCUIElementTypeButton' AND label BEGINSWITH 'Don'",
+    )
+
+    # Full-screen "What’s New in Calendar" sheet shown on first launch in iOS 27.
+    # ENDSWITH avoids matching the curly apostrophe in "What’s".
+    WHATS_NEW_TITLE = (
+        BasePage.By.IOS_PREDICATE,
+        "type == 'XCUIElementTypeStaticText' AND name ENDSWITH 'New in Calendar'",
+    )
+    WHATS_NEW_CONTINUE = (
+        BasePage.By.IOS_PREDICATE,
+        "type == 'XCUIElementTypeButton' AND name == 'Continue'",
     )
 
     def is_location_permission_showing(self, timeout: int = 3) -> bool:
@@ -81,10 +94,10 @@ class CalendarOnboardingPage(BasePage):
         return False
 
     def dismiss_known_prompt(self) -> bool:
-        """Decline one recognized Calendar alert.
+        """Decline one recognized Calendar alert or close the What's New sheet.
 
         Returns:
-            True if an alert was dismissed, False if none is showing.
+            True if a prompt was dismissed, False if none is showing.
 
         Raises:
             AssertionError: If a visible alert is not a known Calendar prompt.
@@ -102,6 +115,9 @@ class CalendarOnboardingPage(BasePage):
                 alert.find_element(*self.DONT_ALLOW_BUTTON).click()
                 return True
             raise AssertionError(f"Unexpected Calendar alert: {title}")
+        if self.is_element_visible(self.WHATS_NEW_TITLE, timeout=0):
+            self.click(self.WHATS_NEW_CONTINUE)
+            return True
         return False
 
     def dismiss_all_onboarding(self, timeout: int | None = None) -> bool:

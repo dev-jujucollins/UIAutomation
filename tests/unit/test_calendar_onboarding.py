@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.support.wait import WebDriverWait
 
 from uiautomation.pages.calendar.calendar_home import CalendarHomePage
@@ -22,6 +23,7 @@ def _alert(title: str) -> MagicMock:
 def _page(*alerts: MagicMock) -> CalendarOnboardingPage:
     driver = MagicMock()
     driver.find_elements.return_value = list(alerts)
+    driver.find_element.side_effect = NoSuchElementException()
     page = CalendarOnboardingPage(driver)
     page._wait = WebDriverWait(driver, 0.02, poll_frequency=0.001)
     return page
@@ -62,6 +64,18 @@ def test_no_visible_alert_is_not_a_dismissal() -> None:
     hidden.is_displayed.return_value = False
 
     assert _page(hidden).dismiss_known_prompt() is False
+
+
+def test_whats_new_sheet_is_continued() -> None:
+    page = _page()
+    page.click = MagicMock()
+    with patch.object(
+        CalendarOnboardingPage,
+        "is_element_visible",
+        side_effect=lambda locator, timeout=2: locator == page.WHATS_NEW_TITLE,
+    ):
+        assert page.dismiss_known_prompt() is True
+    page.click.assert_called_once_with(page.WHATS_NEW_CONTINUE)
 
 
 def test_onboarding_waits_for_prompts_before_home() -> None:
