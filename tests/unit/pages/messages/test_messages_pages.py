@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.support.wait import WebDriverWait
 
 from uiautomation import pytest_plugin
 from uiautomation.pages.messages import ComposeMessagePage, ConversationPage, MessagesHomePage
@@ -51,7 +52,7 @@ def test_replace_text_clears_before_typing_and_checks_result(text: str) -> None:
 
 def test_failed_text_entry_cannot_silently_pass() -> None:
     page = ComposeMessagePage(MagicMock())
-    page.DEFAULT_TIMEOUT = 0
+    page._wait = WebDriverWait(page.driver, 0)
     page.wait_for_clickable = MagicMock()
     page._field_value = MagicMock(return_value="wrong text")
     with pytest.raises(TimeoutException):

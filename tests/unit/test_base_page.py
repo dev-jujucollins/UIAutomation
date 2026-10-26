@@ -122,3 +122,20 @@ def test_scroll_rejects_invalid_limits_and_directions(max_scrolls: int, directio
         BasePage(MagicMock()).scroll_to_element(
             ("accessibility id", "target"), max_scrolls, direction
         )
+
+
+def test_back_button_is_tapped_by_its_ios_identifier() -> None:
+    page = BasePage(MagicMock())
+    page.click = MagicMock()
+
+    page.tap_back_button()
+
+    page.click.assert_called_once_with((BasePage.By.ACCESSIBILITY_ID, "BackButton"))
+
+
+def test_missing_back_button_fails_instead_of_skipping() -> None:
+    page = BasePage(MagicMock())
+    page.click = MagicMock(side_effect=TimeoutException("no back button"))
+
+    with pytest.raises(TimeoutException):
+        page.tap_back_button()

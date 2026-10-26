@@ -19,9 +19,8 @@ class WifiSettingsPage(BasePage):
     toggling Wi-Fi, connecting to networks, and viewing network details.
     """
 
-    # Locators - iOS 26.3+ compatible
-    # Note: iOS 26 uses non-breaking hyphen (Wi‑Fi) in some places
-    # The Wi-Fi switch in iOS 26.3 has name="Wi‑Fi" (non-breaking hyphen)
+    # Note: iOS uses a non-breaking hyphen (Wi‑Fi) in some places,
+    # including the Wi-Fi switch name
     WIFI_SWITCH = (
         BasePage.By.IOS_PREDICATE,
         "type == 'XCUIElementTypeSwitch' AND (name CONTAINS 'Wi-Fi' OR name CONTAINS 'Wi‑Fi')",
@@ -31,7 +30,7 @@ class WifiSettingsPage(BasePage):
         "type == 'XCUIElementTypeStaticText' AND value == 'Wi-Fi' AND label == 'Wi-Fi'",
     )
 
-    # Network list - iOS 26.3 uses "Networks" (not "NETWORKS")
+    # Network list header is "Networks" (not "NETWORKS")
     NETWORKS_SECTION = (
         BasePage.By.IOS_PREDICATE,
         "name == 'Networks' OR name == 'NETWORKS'",
@@ -53,7 +52,7 @@ class WifiSettingsPage(BasePage):
     JOIN_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "Join")
     CANCEL_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "Cancel")
 
-    # Navigation - iOS 26 uses BackButton with Settings label
+    # Navigation bar back button, labeled Settings
     BACK_BUTTON = (
         BasePage.By.IOS_PREDICATE,
         "name == 'BackButton' OR (type == 'XCUIElementTypeButton' AND label == 'Settings')",
@@ -87,7 +86,7 @@ class WifiSettingsPage(BasePage):
             True if Wi-Fi is on.
         """
         # Re-find the element each time to avoid stale element issues
-        # after toggling the switch (iOS 26.3 refreshes the UI)
+        # after toggling the switch (Settings refreshes the UI)
         element = self.find_element(self.WIFI_SWITCH, timeout=5)
         value = element.get_attribute("value")
         return value == "1"
@@ -123,7 +122,7 @@ class WifiSettingsPage(BasePage):
             self.scroll_down()
 
         # Get all cells that look like network entries
-        # iOS 26.3: Network cells have name like "NetworkName, Secure network, Signal strength..."
+        # Network cells have names like "NetworkName, Secure network, Signal strength..."
         network_cells = (
             self.By.IOS_PREDICATE,
             "type == 'XCUIElementTypeCell' AND label CONTAINS 'network'",

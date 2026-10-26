@@ -6,7 +6,7 @@ import platform
 import subprocess
 from collections import Counter
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from time import monotonic
@@ -119,7 +119,7 @@ class RunReport:
             "schema_version": 1,
             "run_id": root.name,
             "integration": integration,
-            "started_at": datetime.now(timezone.utc).isoformat(),
+            "started_at": datetime.now(UTC).isoformat(),
             "target": requested_target,
             "capabilities": {},
             "results": [],
@@ -214,7 +214,7 @@ class RunReport:
             elif result["outcome"] == "skipped" and previous is None:
                 outcomes[result["nodeid"]] = "skipped"
         self.manifest.update(
-            finished_at=datetime.now(timezone.utc).isoformat(),
+            finished_at=datetime.now(UTC).isoformat(),
             duration_seconds=round(monotonic() - self.started, 6),
             exit_status=int(exitstatus),
             summary=dict(Counter(outcomes.values())),

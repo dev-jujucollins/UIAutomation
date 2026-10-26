@@ -6,6 +6,8 @@ import re
 from datetime import date
 from typing import TYPE_CHECKING
 
+from selenium.common.exceptions import StaleElementReferenceException
+
 from ..base_page import BasePage
 
 if TYPE_CHECKING:
@@ -21,7 +23,7 @@ class CalendarHomePage(BasePage):
     navigate between dates, and access calendar features.
     """
 
-    # Locators - iOS 26.3 compatible (Day View is default)
+    # Locators (Day View is the default)
     # Navigation bar elements
     MONTH_VIEW_NAV_BAR = (BasePage.By.ACCESSIBILITY_ID, "MonthViewContainerView")
     DAY_VIEW_NAV_BAR = (BasePage.By.ACCESSIBILITY_ID, "DayViewContainerView")
@@ -51,9 +53,9 @@ class CalendarHomePage(BasePage):
         Check if currently on Calendar home page.
 
         Returns:
-            True if on Calendar home (day view in iOS 26.3).
+            True if on Calendar home (day view).
         """
-        # iOS 26.3 uses Day View by default - check for toolbar or navigation bar
+        # Day View is the default - check for toolbar or navigation bar
         return self.is_element_visible(self.TOOLBAR) or self.is_element_visible(
             self.DAY_VIEW_NAV_BAR
         )
@@ -69,7 +71,7 @@ class CalendarHomePage(BasePage):
         Returns:
             Month name (e.g., "January") or None.
         """
-        # In iOS 26.3, current-day shows format like "Sunday – Jan 11, 2026"
+        # current-day shows a format like "Sunday – Jan 11, 2026"
         if self.is_element_present(self.CURRENT_DAY_LABEL):
             element = self.find_element(self.CURRENT_DAY_LABEL)
             label = element.get_attribute("label")
@@ -124,7 +126,7 @@ class CalendarHomePage(BasePage):
         """
         Tap the Back button to navigate to Month view.
 
-        In iOS 26.3, the Back button is labeled with the current month name
+        The Back button is labeled with the current month name
         (e.g., "January") and is located in the top left corner.
         """
         self.click(self.BACK_BUTTON)
@@ -200,7 +202,7 @@ class CalendarHomePage(BasePage):
         Returns:
             List of date names that have events.
         """
-        # In iOS 26.3, look for event buttons in day view (event-shown:* prefix)
+        # Look for event buttons in day view (event-shown:* prefix)
         dates_with_events = []
         event_buttons = self.find_elements(
             (
@@ -214,7 +216,7 @@ class CalendarHomePage(BasePage):
                 name = button.get_attribute("name")
                 if name and isinstance(name, str):
                     dates_with_events.append(name)
-            except Exception:
+            except StaleElementReferenceException:
                 continue
 
         return dates_with_events

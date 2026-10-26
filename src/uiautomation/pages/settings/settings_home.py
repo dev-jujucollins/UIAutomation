@@ -30,14 +30,14 @@ class SettingsHomePage(BasePage):
     Provides methods to navigate to various settings sections.
     """
 
-    # Locators - iOS 26+ uses name attribute with com.apple.settings.* identifiers
-    # iOS 26.3: Search field is XCUIElementTypeSearchField in the toolbar at bottom
+    # Locators use the name attribute with com.apple.settings.* identifiers
+    # Search field is an XCUIElementTypeSearchField in the bottom toolbar
     SEARCH_FIELD = (
         BasePage.By.IOS_PREDICATE,
         "type == 'XCUIElementTypeSearchField' AND name == 'Search'",
     )
 
-    # Main sections - using name attribute for iOS 26+ compatibility
+    # Main sections, matched by name attribute
     APPLE_ID_CELL = (
         BasePage.By.IOS_PREDICATE,
         "name == 'com.apple.settings.primaryAppleAccount'",
@@ -127,7 +127,7 @@ class SettingsHomePage(BasePage):
         "name == 'com.apple.settings.privacy'",
     )
 
-    # Collection view for scrolling (iOS 26 uses CollectionView instead of Table)
+    # Collection view for scrolling (Settings uses a CollectionView, not a Table)
     SETTINGS_COLLECTION = (BasePage.By.IOS_CLASS_CHAIN, "**/XCUIElementTypeCollectionView[1]")
     SETTINGS_APP = (
         BasePage.By.IOS_PREDICATE,
@@ -231,7 +231,7 @@ class SettingsHomePage(BasePage):
         Args:
             query: Search text.
         """
-        # iOS 26.3: Search field is in the toolbar at the bottom of the screen
+        # Search field is in the toolbar at the bottom of the screen
         # No need to scroll - just tap the search field directly
         # Wait for search field to be available
         self.wait_for_clickable(self.SEARCH_FIELD, timeout=5)
@@ -281,7 +281,7 @@ class SettingsHomePage(BasePage):
         Args:
             enabled: Whether airplane mode should be on.
         """
-        # iOS 26: The actual toggle is the inner XCUIElementTypeSwitch without a name
+        # The actual toggle is the inner XCUIElementTypeSwitch without a name
         # inside the parent element with name='com.apple.settings.airplaneMode'
         inner_switch = (
             self.By.IOS_CLASS_CHAIN,
@@ -301,7 +301,7 @@ class SettingsHomePage(BasePage):
         Returns:
             True if airplane mode is on.
         """
-        # iOS 26: The parent switch element has the value
+        # The parent switch element has the value
         element = self.find_element(self.AIRPLANE_MODE, timeout=5)
         value = element.get_attribute("value")
         return value == "1"
@@ -334,7 +334,7 @@ class SettingsHomePage(BasePage):
 
         from .display_settings import DisplaySettingsPage
 
-        # Display & Brightness requires scrolling in iOS 26+
+        # Display & Brightness is below the fold and needs scrolling
         # Scroll down until we find it
         for _ in range(5):
             try:

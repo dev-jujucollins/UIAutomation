@@ -16,8 +16,8 @@ class DisplaySettingsPage(BasePage):
     brightness, appearance (light/dark mode), text size, and more.
     """
 
-    # Locators - Appearance (iOS 26.3 compatible)
-    # iOS 26.3 uses DBSDeviceAppearanceOptionLight/Dark for Light/Dark buttons
+    # Locators - Appearance
+    # Light/Dark buttons use DBSDeviceAppearanceOptionLight/Dark
     LIGHT_MODE_BUTTON = (
         BasePage.By.IOS_PREDICATE,
         "name == 'DBSDeviceAppearanceOptionLight' OR label == 'Light'",
@@ -26,7 +26,7 @@ class DisplaySettingsPage(BasePage):
         BasePage.By.IOS_PREDICATE,
         "name == 'DBSDeviceAppearanceOptionDark' OR label == 'Dark'",
     )
-    # iOS 26.3: Automatic switch has name="AUTOMATIC" (uppercase)
+    # Automatic switch has name="AUTOMATIC" (uppercase)
     # There's an outer switch container and an inner actual switch
     AUTOMATIC_SWITCH = (
         BasePage.By.IOS_PREDICATE,
@@ -38,13 +38,13 @@ class DisplaySettingsPage(BasePage):
         "**/XCUIElementTypeSwitch[`name == 'AUTOMATIC'`]/XCUIElementTypeSwitch",
     )
 
-    # Brightness slider - iOS 26.3: name="Screen brightness" inside cell name="BRIGHTNESS"
+    # Brightness slider: name="Screen brightness" inside cell name="BRIGHTNESS"
     BRIGHTNESS_SLIDER = (
         BasePage.By.IOS_PREDICATE,
         "type == 'XCUIElementTypeSlider' AND (name == 'Screen brightness' OR name == 'Brightness')",
     )
 
-    # True Tone - iOS 26.3: name="WHITE_BALANCE" with label="True Tone"
+    # True Tone: name="WHITE_BALANCE" with label="True Tone"
     TRUE_TONE_SWITCH = (
         BasePage.By.IOS_PREDICATE,
         "type == 'XCUIElementTypeSwitch' AND (name == 'WHITE_BALANCE' OR name == 'True Tone')",
@@ -124,7 +124,7 @@ class DisplaySettingsPage(BasePage):
             True if Dark mode is active.
         """
         # Check if dark mode button is selected
-        # iOS 26.3: The button has value="1" when selected
+        # The button has value="1" when selected
         element = self.find_element(self.DARK_MODE_BUTTON)
         selected = element.get_attribute("selected")
         value = element.get_attribute("value")
@@ -137,7 +137,7 @@ class DisplaySettingsPage(BasePage):
         Returns:
             True if Light mode is active.
         """
-        # iOS 26.3: The button has value="1" when selected
+        # The button has value="1" when selected
         element = self.find_element(self.LIGHT_MODE_BUTTON)
         selected = element.get_attribute("selected")
         value = element.get_attribute("value")
@@ -153,7 +153,7 @@ class DisplaySettingsPage(BasePage):
         Args:
             enabled: Whether automatic appearance should be on.
         """
-        # iOS 26.3: Need to click the inner switch element, not the outer container
+        # Click the inner switch element, not the outer container
         click_locator = (
             self.AUTOMATIC_SWITCH_INNER
             if self.is_element_present(self.AUTOMATIC_SWITCH_INNER, timeout=2)
@@ -266,7 +266,7 @@ class DisplaySettingsPage(BasePage):
         Args:
             enabled: Whether True Tone should be on.
         """
-        # iOS 26.3: Need to click the inner switch element, not the outer container
+        # Click the inner switch element, not the outer container
         click_locator = (
             self.TRUE_TONE_SWITCH_INNER
             if self.is_element_present(self.TRUE_TONE_SWITCH_INNER, timeout=2)

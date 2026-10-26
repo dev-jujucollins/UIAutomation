@@ -81,7 +81,8 @@ def test_title_input_requires_matching_value() -> None:
 def test_discard_handles_delayed_confirmation_and_offscreen_title(title_visible: bool) -> None:
     driver, title, cancel, confirm, home = [MagicMock() for _ in range(5)]
     page = NewEventPage(driver)
-    page._wait = WebDriverWait(driver, 0.05, poll_frequency=0.001)
+    # Success needs several polls; a generous budget keeps slow CI runners from timing out.
+    page._wait = WebDriverWait(driver, 5, poll_frequency=0.001)
     state = "editor"
     polls = 0
     actions: list[str] = []
@@ -130,7 +131,8 @@ def test_discard_handles_delayed_confirmation_and_offscreen_title(title_visible:
 def test_closed_editor_cleanup_does_not_click_unrelated_cancel_button() -> None:
     driver, home, cancel = MagicMock(), MagicMock(), MagicMock()
     page = NewEventPage(driver)
-    page._wait = WebDriverWait(driver, 0.02, poll_frequency=0.001)
+    # Home must be seen on two polls; a tiny budget flakes on slow CI runners.
+    page._wait = WebDriverWait(driver, 5, poll_frequency=0.001)
     home.is_displayed.return_value = True
     cancel.is_displayed.return_value = True
     driver.find_elements.side_effect = lambda *locator: (

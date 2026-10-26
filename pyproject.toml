@@ -3,9 +3,9 @@ name = "uiautomation"
 version = "0.1.0"
 description = "iOS Native Apps UI Automation Framework using Appium and Python"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = { text = "MIT" }
-authors = [{ name = "UIAutomation" }]
+authors = [{ name = "Julius Collins" }]
 
 dependencies = [
     "appium-python-client>=3.0.0",
@@ -36,7 +36,7 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
@@ -44,7 +44,7 @@ ignore = ["E501"]
 
 [tool.pyright]
 include = ["src", "conftest.py"]
-pythonVersion = "3.10"
+pythonVersion = "3.12"
 typeCheckingMode = "basic"
 
 [tool.pytest.ini_options]
@@ -61,12 +61,10 @@ markers = [
     "integration: Tests requiring an iOS target",
     "diagnostic: Environment-dependent observations",
     "settings: Tests for the Settings app",
-    "safari: Tests for Safari browser",
     "contacts: Tests for Contacts app",
     "calendar: Tests for Calendar app",
     "maps: Tests for Maps search and route previews",
     "messages: Tests for Messages app drafts and navigation",
-    "photos: Tests for Photos app",
     "smoke: Smoke tests (quick sanity checks)",
     "regression: Full regression tests",
     "slow: Tests that take a long time to run",
@@ -83,6 +81,8 @@ timeout = 120
 [tool.coverage.run]
 branch = true
 source = ["uiautomation"]
+# Measure the pytest subprocesses that exercise the plugin hooks.
+patch = ["subprocess"]
 
 [tool.coverage.report]
 show_missing = true

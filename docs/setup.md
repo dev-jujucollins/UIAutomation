@@ -1,6 +1,6 @@
 # Setup and environment diagnostics
 
-Unit tests need only Python 3.10+ and uv. Local iOS integration tests additionally
+Unit tests need only Python 3.12+ and uv. Local iOS integration tests additionally
 need macOS, Xcode 27+, an installed iOS simulator runtime, Node.js, Appium, and the
 XCUITest driver. Install Python dependencies from the checkout:
 
@@ -8,6 +8,19 @@ XCUITest driver. Install Python dependencies from the checkout:
 uv sync
 uv run pytest
 ```
+
+For device testing, install Appium and its iOS driver:
+
+```bash
+npm install -g appium
+appium driver install xcuitest
+```
+
+Install simulator runtimes in Xcode Settings and create simulators in Device Hub or
+with `simctl`. The framework boots existing simulators; it does not create them or
+download Xcode, runtimes, Appium, or drivers. Any iPhone simulator on iOS 27.0 works;
+the [Maps](maps-testing.md), [Messages](messages-testing.md), and
+[lifecycle](lifecycle-testing.md) guides describe optional dedicated simulators.
 
 ## Check a machine before running iOS tests
 
@@ -59,6 +72,42 @@ checking optional dependencies. A skipped upstream doctor is reported as a
 warning. Required upstream failures fail the overall report; optional upstream
 recommendations do not necessarily prevent this project's simulator tests.
 
+## What a device run changes
+
+One Appium driver session is reused per pytest run. Integration tests run serially;
+parallel device execution is rejected. App fixtures establish each test's starting
+state and register termination cleanup before launching the app.
+
+For simulator runs, the framework:
+
+- Finds an existing target and boots it if needed.
+- Opens Device Hub from `DEVELOPER_DIR` or the Xcode selected by `xcode-select`.
+  `--headless-simulator` skips that window. Appium always receives `isHeadless=True`
+  so it does not attempt to open the removed Simulator.app.
+- Starts local Appium if the configured local server is unavailable. An existing
+  server is reused and supplies its own installed drivers.
+- By default, terminates Settings/Calendar and resets their privacy permissions
+  once per session. This does not erase app data.
+
+Per-app cleanup has additional rules:
+
+- Settings Wi-Fi mutation fixtures restore the initial radio state.
+  The brightness mutation case verifies the changed slider reading and restores
+  its original value; invalid readings fail instead of returning a fallback.
+- Messages clears only the test-owned compose draft before cancellation; existing
+  conversation drafts are preserved.
+- Maps sets the selected simulator's location to Apple Park before each test,
+  handles location prompts, dismisses owned cards, terminates Maps, and clears
+  the simulated location and authorization on teardown. Searches can remain in Recents.
+
+`--skip-simulator-state-reset` or `--no-reset` skips the session-level Settings/Calendar
+reset. Neither disables app fixture cleanup or Maps' per-test permission resets.
+`--restart-simulator` takes effect only when session-level reset is enabled.
+
+Setup subprocesses have bounded timeouts. Pytest defaults to 120 seconds per test;
+examples use 300 seconds to allow setup. A first WebDriverAgent build may require
+`--timeout=600`.
+
 ## Resolve common failures
 
 - **Xcode missing, too old, or wrong selection:** Install Xcode 27+ and select it
@@ -103,8 +152,8 @@ uv run pytest --run-integration -m smoke --platform-version 27.0 \
   --headless-simulator --timeout=300
 ```
 
-Create/delete lifecycle journeys use an explicitly isolated simulator; see the
-project README for their opt-in options and cleanup contract.
+Create/delete lifecycle journeys use an explicitly isolated simulator; see
+[lifecycle testing](lifecycle-testing.md) for their opt-in options and cleanup contract.
 
 ### Observed Calendar startup crash
 
