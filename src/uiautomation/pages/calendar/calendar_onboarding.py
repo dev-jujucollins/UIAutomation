@@ -1,48 +1,27 @@
 """Calendar Onboarding Page object for handling first-time launch screens."""
 
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+from selenium.webdriver.remote.webdriver import WebDriver
+
 from ..base_page import BasePage
 
 
 class CalendarOnboardingPage(BasePage):
     """
-    Page object for Calendar app onboarding screens.
+    Page object for Calendar app onboarding prompts.
 
-    Handles the permission dialogs and welcome screens that appear
-    when the Calendar app is launched for the first time.
-
-    Onboarding flow on iOS 26.2:
-    1. Location Permission Alert - "Allow "Calendar" to use your location?"
-    2. Notifications Permission Alert - "Calendar Would Like to Send You Notifications"
+    Calendar asks for location and notification access on first launch. Both are
+    declined. Any other alert fails the run so new UI is inspected, not tapped through.
     """
 
-    # Location Permission Alert
-    # Alert title: "Allow "Calendar" to use your location?"
     LOCATION_ALERT = (
         BasePage.By.IOS_PREDICATE,
         "type == 'XCUIElementTypeAlert' AND name CONTAINS 'location'",
     )
-    LOCATION_ALERT_TITLE = (
-        BasePage.By.ACCESSIBILITY_ID,
-        'Allow "Calendar" to use your location?',
-    )
-
-    # Location permission buttons
-    ALLOW_ONCE_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "Allow Once")
-    ALLOW_WHILE_USING_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "Allow While Using App")
-
-    # Notifications Permission Alert
-    # Alert title: "Calendar Would Like to Send You Notifications"
     NOTIFICATIONS_ALERT = (
         BasePage.By.IOS_PREDICATE,
         "type == 'XCUIElementTypeAlert' AND name CONTAINS 'Notifications'",
     )
-    NOTIFICATIONS_ALERT_TITLE = (
-        BasePage.By.IOS_PREDICATE,
-        "label CONTAINS 'Send You Notifications'",
-    )
-
-    # Notification permission buttons
-    ALLOW_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "Allow")
 
     # Shared deny button (used by both location and notifications alerts)
     # Use predicate with BEGINSWITH 'Don' to handle special apostrophe characters
@@ -50,17 +29,6 @@ class CalendarOnboardingPage(BasePage):
         BasePage.By.IOS_PREDICATE,
         "type == 'XCUIElementTypeButton' AND label BEGINSWITH 'Don'",
     )
-
-    # Generic onboarding buttons (for future screens)
-    CONTINUE_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "Continue")
-    NEXT_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "Next")
-    GET_STARTED_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "Get Started")
-    SKIP_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "Skip")
-    DONE_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "Done")
-
-    # -------------------------------------------------------------------------
-    # Location Permission Methods
-    # -------------------------------------------------------------------------
 
     def is_location_permission_showing(self, timeout: int = 3) -> bool:
         """
@@ -73,30 +41,6 @@ class CalendarOnboardingPage(BasePage):
             True if the location permission alert is showing.
         """
         return self.is_element_present(self.LOCATION_ALERT, timeout=timeout)
-
-    def allow_location_once(self) -> bool:
-        """
-        Allow location access once.
-
-        Returns:
-            True if the button was clicked, False if alert wasn't showing.
-        """
-        if self.is_element_present(self.ALLOW_ONCE_BUTTON, timeout=2):
-            self.click(self.ALLOW_ONCE_BUTTON)
-            return True
-        return False
-
-    def allow_location_while_using(self) -> bool:
-        """
-        Allow location access while using the app.
-
-        Returns:
-            True if the button was clicked, False if alert wasn't showing.
-        """
-        if self.is_element_present(self.ALLOW_WHILE_USING_BUTTON, timeout=2):
-            self.click(self.ALLOW_WHILE_USING_BUTTON)
-            return True
-        return False
 
     def dismiss_location_permission(self) -> bool:
         """
@@ -111,10 +55,6 @@ class CalendarOnboardingPage(BasePage):
                 return True
         return False
 
-    # -------------------------------------------------------------------------
-    # Notifications Permission Methods
-    # -------------------------------------------------------------------------
-
     def is_notifications_permission_showing(self, timeout: int = 3) -> bool:
         """
         Check if the notifications permission dialog is displayed.
@@ -126,18 +66,6 @@ class CalendarOnboardingPage(BasePage):
             True if the notifications permission alert is showing.
         """
         return self.is_element_present(self.NOTIFICATIONS_ALERT, timeout=timeout)
-
-    def allow_notifications(self) -> bool:
-        """
-        Allow notifications.
-
-        Returns:
-            True if the button was clicked, False if alert wasn't showing.
-        """
-        if self.is_element_present(self.ALLOW_BUTTON, timeout=2):
-            self.click(self.ALLOW_BUTTON)
-            return True
-        return False
 
     def dismiss_notifications_permission(self) -> bool:
         """
@@ -152,76 +80,56 @@ class CalendarOnboardingPage(BasePage):
                 return True
         return False
 
-    def dismiss_all_onboarding(self, max_screens: int = 5) -> bool:
-        """
-        Dismiss all onboarding screens to reach the main Calendar view.
-
-        This method handles all known onboarding screens including:
-        - Location permission dialog (taps 'Don't Allow')
-        - Notifications permission dialog (taps 'Don't Allow')
-        - Any future welcome/intro screens
-
-        Args:
-            max_screens: Maximum number of screens to attempt dismissing.
+    def dismiss_known_prompt(self) -> bool:
+        """Decline one recognized Calendar alert.
 
         Returns:
-            True if all onboarding was dismissed successfully.
+            True if an alert was dismissed, False if none is showing.
+
+        Raises:
+            AssertionError: If a visible alert is not a known Calendar prompt.
         """
-        import time
-
-        for _ in range(max_screens):
-            handled_screen = False
-
-            # Handle location permission
-            if self.is_location_permission_showing(timeout=2):
-                handled_screen = self.dismiss_location_permission()
-                if handled_screen:
-                    time.sleep(0.5)
+        for alert in self.driver.find_elements(self.By.CLASS_NAME, "XCUIElementTypeAlert"):
+            try:
+                if not alert.is_displayed():
                     continue
+                title = alert.get_attribute("name") or ""
+            except StaleElementReferenceException:
+                # The alert is animating away; check again on the next poll.
                 return False
-
-            # Handle notifications permission
-            if self.is_notifications_permission_showing(timeout=2):
-                handled_screen = self.dismiss_notifications_permission()
-                if handled_screen:
-                    time.sleep(0.5)
-                    continue
-                return False
-
-            # Handle generic continue/next/skip buttons
-            generic_buttons = [
-                self.CONTINUE_BUTTON,
-                self.NEXT_BUTTON,
-                self.GET_STARTED_BUTTON,
-                self.SKIP_BUTTON,
-                self.DONE_BUTTON,
-            ]
-
-            for button in generic_buttons:
-                if self.is_element_present(button, timeout=1):
-                    self.click(button)
-                    time.sleep(0.5)
-                    handled_screen = True
-                    break
-
-            if not handled_screen:
-                # No more onboarding screens found
+            # Match on words, not exact titles, so curly or straight quotes both work.
+            if "Calendar" in title and ("location" in title or "Notifications" in title):
+                alert.find_element(*self.DONT_ALLOW_BUTTON).click()
                 return True
-
+            raise AssertionError(f"Unexpected Calendar alert: {title}")
         return False
 
-    def get_location_alert_text(self) -> str | None:
+    def dismiss_all_onboarding(self, timeout: int | None = None) -> bool:
         """
-        Get the text from the location permission alert.
+        Dismiss known first-launch prompts until Calendar home is visible.
+
+        Args:
+            timeout: Optional timeout override.
 
         Returns:
-            The alert text or None if not present.
+            True once Calendar home is visible, False if it never appears.
+
+        Raises:
+            AssertionError: If an unrecognized alert appears.
         """
-        if self.is_location_permission_showing():
-            try:
-                element = self.find_element(self.LOCATION_ALERT_TITLE, timeout=2)
-                label = element.get_attribute("label")
-                return label if isinstance(label, str) else None
-            except Exception:
-                return None
-        return None
+        from .calendar_home import CalendarHomePage
+
+        home = CalendarHomePage(self.driver)
+
+        def ready(_: WebDriver) -> bool:
+            if self.dismiss_known_prompt():
+                return False
+            return home.is_element_visible(home.TOOLBAR, timeout=0) or home.is_element_visible(
+                home.DAY_VIEW_NAV_BAR, timeout=0
+            )
+
+        try:
+            self._get_wait(timeout).until(ready)
+        except TimeoutException:
+            return False
+        return True
