@@ -15,6 +15,10 @@ from uiautomation.pages.settings.display_settings import DisplaySettingsPage
 from uiautomation.pages.settings.settings_home import SettingsHomePage
 from uiautomation.pages.settings.wifi_settings import WifiSettingsPage
 
+# Mocked waits succeed after a few polls; a roomy budget keeps slow CI runners from
+# timing out while passing tests still return in milliseconds.
+SUCCESS_TIMEOUT = 1.0
+
 
 def test_display_navigation_propagates_broken_session() -> None:
     driver = MagicMock()
@@ -41,7 +45,7 @@ def test_brightness_waits_for_reported_value_after_one_tap() -> None:
     driver = MagicMock()
     driver.find_element.return_value.rect = {"x": 0, "y": 0, "width": 100, "height": 10}
     page = DisplaySettingsPage(driver)
-    page._wait = WebDriverWait(driver, 0.03, poll_frequency=0.001)
+    page._wait = WebDriverWait(driver, SUCCESS_TIMEOUT, poll_frequency=0.001)
     page.get_brightness_level = MagicMock(side_effect=[0.1, StaleElementReferenceException(), 0.48])
     page.set_brightness_level(0.5)
     driver.execute_script.assert_called_once_with("mobile: tap", {"x": 50, "y": 5})
@@ -103,7 +107,7 @@ def test_nested_switch_uses_reported_state_and_available_tap_control(
 ) -> None:
     driver, outer, inner = MagicMock(), MagicMock(), MagicMock()
     page = page_type(driver)
-    page._wait = WebDriverWait(driver, 0.02, poll_frequency=0.001)
+    page._wait = WebDriverWait(driver, SUCCESS_TIMEOUT, poll_frequency=0.001)
     state_locator = getattr(page, state_name)
     page.is_element_present = MagicMock(return_value=inner_present)
     driver.find_element.side_effect = lambda *locator: outer if locator == state_locator else inner
@@ -122,7 +126,7 @@ def test_wifi_state_changes_wait_for_the_final_value(method: str, before: str, a
     driver.find_element.return_value = switch
     switch.get_attribute.side_effect = [before, before, after]
     page = WifiSettingsPage(driver)
-    page._wait = WebDriverWait(driver, 0.02, poll_frequency=0.001)
+    page._wait = WebDriverWait(driver, SUCCESS_TIMEOUT, poll_frequency=0.001)
     getattr(page, method)()
     switch.click.assert_called_once()
     assert switch.get_attribute.call_count == 3
