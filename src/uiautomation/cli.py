@@ -10,7 +10,14 @@ from pathlib import Path
 
 from uiautomation.utils.doctor import diagnose_environment, format_report
 from uiautomation.utils.local_runner import SUITES, run_suite
-from uiautomation.utils.run_history import flaky_tests, format_history, summarize_history
+from uiautomation.utils.run_history import (
+    failed_tests,
+    flaky_tests,
+    format_history,
+    latest_run,
+    rerun_options,
+    summarize_history,
+)
 from uiautomation.utils.simulator_control import (
     SimulatorDevice,
     list_available_simulators,
@@ -79,6 +86,37 @@ def _forward_options(args: argparse.Namespace) -> list[str]:
     return forwarded + (extra[1:] if extra[:1] == ["--"] else extra)
 
 
+def _rerun(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    """Re-run the latest run's failures with its device and opt-in flags."""
+    if not args.artifacts_dir.is_dir():
+        parser.error("--artifacts-dir must be an existing directory")
+    run = latest_run(args.artifacts_dir)
+    if run is None:
+        print(f"No finished run found under {args.artifacts_dir}.", file=sys.stderr)
+        return 1
+    failed = failed_tests(run)
+    if not failed:
+        print(f"Latest run {run.get('run_id')} had no failures; nothing to rerun.")
+        return 0
+    explicit = _forward_options(args)
+    if (run.get("target") or {}).get("kind") == "physical" and "--udid" not in explicit:
+        parser.error("The latest run used a physical device; pass --udid and --team-id again")
+    # Options given now win over the recorded ones.
+    recorded = rerun_options(run, skip=set(explicit))
+    print(f"Rerunning {len(failed)} failed test(s) from run {run.get('run_id')}:")
+    for nodeid in failed:
+        print(f"  {nodeid}")
+    return run_suite(
+        "rerun",
+        recorded + explicit,
+        args.artifacts_dir,
+        args.email,
+        args.email_preview,
+        args.email_config,
+        selection=failed,
+    )
+
+
 def format_devices(
     devices: list[SimulatorDevice], target: SimulatorDevice | None, reason: str
 ) -> str:
@@ -126,6 +164,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     run.add_argument("--suite", choices=tuple(SUITES), default="unit")
     _add_run_options(run)
+    rerun = commands.add_parser(
+        "rerun", help="Re-run the latest run's failed tests on the same target", allow_abbrev=False
+    )
+    _add_run_options(rerun)
     history = commands.add_parser("history", help="Compare completed run manifests")
     history.add_argument("--artifacts-dir", type=Path, default=Path("artifacts"))
     history.add_argument("--limit", type=int, default=10)
@@ -171,6 +213,8 @@ def main(argv: list[str] | None = None) -> int:
             args.email_preview,
             args.email_config,
         )
+    if args.command == "rerun":
+        return _rerun(args, parser)
     if args.command == "history":
         if args.limit < 1:
             parser.error("--limit must be positive")

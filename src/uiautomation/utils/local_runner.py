@@ -52,8 +52,13 @@ def run_suite(
     email: bool = False,
     preview: bool = False,
     email_config: Path = Path("email.local"),
+    selection: list[str] | None = None,
 ) -> int:
-    """Keep pytest's exit status even if configuration or email delivery fails."""
+    """Keep pytest's exit status even if configuration or email delivery fails.
+
+    ``selection`` replaces the suite's paths and markers with explicit test IDs; ``suite``
+    then only labels the run.
+    """
     root = artifacts.resolve() / f"local-{uuid4().hex}"
     root.mkdir(parents=True)
     report_path = root / "report.html"
@@ -71,7 +76,7 @@ def run_suite(
         sys.executable,
         "-m",
         "pytest",
-        *SUITES[suite],
+        *(SUITES[suite] if selection is None else selection),
         *pytest_args,
         *report_options,
         "--artifacts-dir",

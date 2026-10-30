@@ -182,3 +182,12 @@ def test_unavailable_report_sends_summary_without_stale_attachment(
     assert send.call_args.kwargs["html_report"] is None
     assert "HTML attachment unavailable" in send.call_args.args[2]
     assert "old report" not in send.call_args.args[2]
+
+
+def test_explicit_selection_replaces_suite_paths(tmp_path, monkeypatch) -> None:
+    run = MagicMock(return_value=MagicMock(returncode=0))
+    monkeypatch.setattr(local_runner.subprocess, "run", run)
+    assert local_runner.run_suite("smoke", ["-q"], tmp_path, selection=["tests/a.py::t"]) == 0
+    command = run.call_args.args[0]
+    assert command[3:5] == ["tests/a.py::t", "-q"]
+    assert "smoke" not in command and "tests/integration" not in command
