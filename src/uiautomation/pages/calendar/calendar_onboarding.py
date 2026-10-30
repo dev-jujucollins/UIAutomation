@@ -1,9 +1,10 @@
 """Calendar Onboarding Page object for handling first-time launch screens."""
 
-from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.remote.webdriver import WebDriver
 
 from ..base_page import BasePage
+from ..system_prompts import answer_system_prompt
 
 
 class CalendarOnboardingPage(BasePage):
@@ -11,26 +12,10 @@ class CalendarOnboardingPage(BasePage):
     Page object for Calendar app onboarding prompts.
 
     Calendar asks for location, notification, and contacts access on first launch, and
-    iOS 27 adds a "What’s New in Calendar" sheet. The permissions are declined and the sheet
-    is continued past. Any other alert fails the run so new UI is inspected, not
-    tapped through.
+    iOS 27 adds a "What’s New in Calendar" sheet. Permission prompts are declined through
+    the shared ``system_prompts`` table and the sheet is continued past. Any other alert
+    fails the run so new UI is inspected, not tapped through.
     """
-
-    LOCATION_ALERT = (
-        BasePage.By.IOS_PREDICATE,
-        "type == 'XCUIElementTypeAlert' AND name CONTAINS 'location'",
-    )
-    NOTIFICATIONS_ALERT = (
-        BasePage.By.IOS_PREDICATE,
-        "type == 'XCUIElementTypeAlert' AND name CONTAINS 'Notifications'",
-    )
-
-    # Shared deny button (used by both location and notifications alerts)
-    # Use predicate with BEGINSWITH 'Don' to handle special apostrophe characters
-    DONT_ALLOW_BUTTON = (
-        BasePage.By.IOS_PREDICATE,
-        "type == 'XCUIElementTypeButton' AND label BEGINSWITH 'Don'",
-    )
 
     # Full-screen "What’s New in Calendar" sheet shown on first launch in iOS 27.
     # ENDSWITH avoids matching the curly apostrophe in "What’s".
@@ -43,82 +28,17 @@ class CalendarOnboardingPage(BasePage):
         "type == 'XCUIElementTypeButton' AND name == 'Continue'",
     )
 
-    def is_location_permission_showing(self, timeout: int = 3) -> bool:
-        """
-        Check if the location permission dialog is displayed.
-
-        Args:
-            timeout: Time to wait for the alert.
-
-        Returns:
-            True if the location permission alert is showing.
-        """
-        return self.is_element_present(self.LOCATION_ALERT, timeout=timeout)
-
-    def dismiss_location_permission(self) -> bool:
-        """
-        Dismiss location permission by declining access.
-
-        Returns:
-            True if the button was clicked, False if alert wasn't showing.
-        """
-        if self.is_location_permission_showing(timeout=1):
-            if self.is_element_present(self.DONT_ALLOW_BUTTON, timeout=2):
-                self.click(self.DONT_ALLOW_BUTTON)
-                return True
-        return False
-
-    def is_notifications_permission_showing(self, timeout: int = 3) -> bool:
-        """
-        Check if the notifications permission dialog is displayed.
-
-        Args:
-            timeout: Time to wait for the alert.
-
-        Returns:
-            True if the notifications permission alert is showing.
-        """
-        return self.is_element_present(self.NOTIFICATIONS_ALERT, timeout=timeout)
-
-    def dismiss_notifications_permission(self) -> bool:
-        """
-        Dismiss notifications permission by declining access.
-
-        Returns:
-            True if the button was clicked, False if alert wasn't showing.
-        """
-        if self.is_notifications_permission_showing(timeout=1):
-            if self.is_element_present(self.DONT_ALLOW_BUTTON, timeout=2):
-                self.click(self.DONT_ALLOW_BUTTON)
-                return True
-        return False
-
     def dismiss_known_prompt(self) -> bool:
-        """Decline one recognized Calendar alert or close the What's New sheet.
+        """Decline one known system prompt or close the What's New sheet.
 
         Returns:
             True if a prompt was dismissed, False if none is showing.
 
         Raises:
-            AssertionError: If a visible alert is not a known Calendar prompt.
+            AssertionError: If a visible alert is not a known system prompt.
         """
-        for alert in self.driver.find_elements(self.By.CLASS_NAME, "XCUIElementTypeAlert"):
-            try:
-                if not alert.is_displayed():
-                    continue
-                # iOS 27 permission alerts name themselves by service ID
-                # (kTCCServiceAddressBook-staged-alert); the label is the visible title.
-                title = alert.get_attribute("label") or alert.get_attribute("name") or ""
-            except StaleElementReferenceException:
-                # The alert is animating away; check again on the next poll.
-                return False
-            # Match on words, not exact titles, so curly or straight quotes both work.
-            if "Calendar" in title and any(
-                word in title for word in ("location", "Notifications", "contacts")
-            ):
-                alert.find_element(*self.DONT_ALLOW_BUTTON).click()
-                return True
-            raise AssertionError(f"Unexpected Calendar alert: {title}")
+        if answer_system_prompt(self.driver, "Calendar"):
+            return True
         if self.is_element_visible(self.WHATS_NEW_TITLE, timeout=0):
             self.click(self.WHATS_NEW_CONTINUE)
             return True

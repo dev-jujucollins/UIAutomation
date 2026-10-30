@@ -8,7 +8,6 @@ from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.support.wait import WebDriverWait
 
 from uiautomation.pages.base_page import BasePage
-from uiautomation.pages.calendar.calendar_onboarding import CalendarOnboardingPage
 from uiautomation.pages.calendar.events import CalendarEventsPage
 from uiautomation.pages.calendar.new_event import NewEventPage
 
@@ -145,11 +144,6 @@ class CalendarHarness:
                 confirm if nested == page.DELETE_CONFIRM else self.find_one(*nested)
             )
             return [sheet]
-        if self.state == "notifications":
-            if locator == CalendarOnboardingPage.NOTIFICATIONS_ALERT:
-                return [self.element("notifications")]
-            if locator == CalendarOnboardingPage.DONT_ALLOW_BUTTON:
-                return [self.element("Don't Allow", lambda: self.switch_state("home"))]
         if locator == (BasePage.By.CLASS_NAME, "XCUIElementTypeSheet") and self.state.endswith(
             "sheet"
         ):
@@ -158,7 +152,14 @@ class CalendarHarness:
             locator == (BasePage.By.CLASS_NAME, "XCUIElementTypeAlert")
             and self.state == "notifications"
         ):
-            return [self.element(self.state)]
+            alert = self.element(
+                "notifications", label="“Calendar” Would Like to Send You Notifications"
+            )
+            deny = self.element(
+                "Don’t Allow", lambda: self.switch_state("home"), label="Don’t Allow"
+            )
+            alert.find_elements.return_value = [deny]
+            return [alert]
         return []
 
 

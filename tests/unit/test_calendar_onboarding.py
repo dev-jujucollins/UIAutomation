@@ -11,12 +11,16 @@ from uiautomation.pages.calendar.calendar_onboarding import CalendarOnboardingPa
 
 LOCATION_TITLE = "Allow “Calendar” to use your location?"
 NOTIFICATIONS_TITLE = "“Calendar” Would Like to Send You Notifications"
+CONTACTS_TITLE = "Allow “Calendar” to access your contacts?"
 
 
 def _alert(title: str) -> MagicMock:
     alert = MagicMock()
     alert.is_displayed.return_value = True
     alert.get_attribute.return_value = title
+    deny = MagicMock()
+    deny.get_attribute.return_value = "Don’t Allow"
+    alert.find_elements.return_value = [deny]
     return alert
 
 
@@ -29,24 +33,13 @@ def _page(*alerts: MagicMock) -> CalendarOnboardingPage:
     return page
 
 
-def test_dismiss_location_permission_uses_dont_allow() -> None:
-    """Location dismissal should decline permission instead of granting it."""
-    page = CalendarOnboardingPage(MagicMock())
-    page.is_location_permission_showing = MagicMock(return_value=True)
-    page.is_element_present = MagicMock(return_value=True)
-    page.click = MagicMock()
-
-    assert page.dismiss_location_permission() is True
-    page.click.assert_called_once_with(page.DONT_ALLOW_BUTTON)
-
-
-@pytest.mark.parametrize("title", [LOCATION_TITLE, NOTIFICATIONS_TITLE])
+@pytest.mark.parametrize("title", [LOCATION_TITLE, NOTIFICATIONS_TITLE, CONTACTS_TITLE])
 def test_known_permission_alerts_are_declined(title: str) -> None:
     alert = _alert(title)
     page = _page(alert)
 
     assert page.dismiss_known_prompt() is True
-    alert.find_element.return_value.click.assert_called_once()
+    alert.find_elements.return_value[0].click.assert_called_once_with()
 
 
 @pytest.mark.parametrize("title", ["Allow “Calendar” to access your photos?", ""])
@@ -56,7 +49,7 @@ def test_unknown_alert_fails_instead_of_tapping_through(title: str) -> None:
 
     with pytest.raises(AssertionError, match="Unexpected Calendar alert"):
         page.dismiss_known_prompt()
-    alert.find_element.assert_not_called()
+    alert.find_elements.return_value[0].click.assert_not_called()
 
 
 def test_no_visible_alert_is_not_a_dismissal() -> None:
@@ -90,18 +83,3 @@ def test_onboarding_reports_missing_home() -> None:
     page = _page()
     with patch.object(CalendarHomePage, "is_element_visible", return_value=False):
         assert page.dismiss_all_onboarding() is False
-
-
-def test_ios_27_contacts_alert_is_declined_by_label() -> None:
-    """iOS 27 names TCC alerts by service ID; only the label carries the visible title."""
-    alert = MagicMock()
-    alert.is_displayed.return_value = True
-    alert.get_attribute.side_effect = {
-        "name": "kTCCServiceAddressBook-staged-alert",
-        "label": "Allow “Calendar” to access your contacts?",
-    }.get
-    page = _page(alert)
-
-    assert page.dismiss_known_prompt() is True
-    alert.find_element.assert_called_once_with(*page.DONT_ALLOW_BUTTON)
-    alert.find_element.return_value.click.assert_called_once_with()

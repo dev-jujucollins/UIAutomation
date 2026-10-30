@@ -52,45 +52,14 @@ def test_route_link_has_explicit_endpoints_and_driving_mode() -> None:
     }
 
 
-@pytest.mark.parametrize(
-    "permission,button", [("allow", "Allow While Using App"), ("deny", "Don’t Allow")]
-)
-def test_location_decision_uses_matching_prompt(permission: str, button: str) -> None:
+@pytest.mark.parametrize("permission", ["allow", "deny"])
+def test_alerts_use_shared_prompt_table_with_permission(permission: str) -> None:
     page = MapsPage(MagicMock())
-    alert = MagicMock()
-    alert.get_attribute.return_value = "Allow “Maps” to use your location?"
-    page.driver.find_elements.return_value = [alert]
-    assert page.dismiss_known_onboarding(permission)
-    alert.find_element.assert_called_once_with(
-        page.By.IOS_PREDICATE, f"type == 'XCUIElementTypeButton' AND label == '{button}'"
-    )
-
-
-@pytest.mark.parametrize("permission,button", [("allow", "Allow"), ("deny", "Don’t Allow")])
-def test_widgets_location_decision_uses_matching_prompt(permission: str, button: str) -> None:
-    page = MapsPage(MagicMock())
-    alert = MagicMock()
-    alert.get_attribute.return_value = "Allow widgets from “Maps” to use your location?"
-    page.driver.find_elements.return_value = [alert]
-    assert page.dismiss_known_onboarding(permission)
-    alert.find_element.assert_called_once_with(
-        page.By.IOS_PREDICATE, f"type == 'XCUIElementTypeButton' AND label == '{button}'"
-    )
-
-
-def test_ios_27_contacts_alert_is_declined_by_label() -> None:
-    """iOS 27 names TCC alerts and buttons by service ID; labels carry the visible text."""
-    page = MapsPage(MagicMock())
-    alert = MagicMock()
-    alert.get_attribute.side_effect = {
-        "name": "kTCCServiceAddressBook-staged-alert",
-        "label": "Allow “Maps” to access your contacts?",
-    }.get
-    page.driver.find_elements.return_value = [alert]
-    assert page.dismiss_known_onboarding("allow")
-    alert.find_element.assert_called_once_with(
-        page.By.IOS_PREDICATE, "type == 'XCUIElementTypeButton' AND label == 'Don’t Allow'"
-    )
+    with patch(
+        "uiautomation.pages.maps.maps_page.answer_system_prompt", return_value=True
+    ) as answer:
+        assert page.dismiss_known_onboarding(permission)
+    answer.assert_called_once_with(page.driver, "Maps", permission)
 
 
 def test_unexpected_alert_fails_without_accepting() -> None:
