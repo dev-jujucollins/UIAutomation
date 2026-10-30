@@ -11,6 +11,7 @@ from selenium.common.exceptions import NoSuchElementException, StaleElementRefer
 
 from ...drivers.ios_driver import SystemApps
 from ..base_page import BasePage
+from ..system_prompts import answer_system_prompt
 
 
 class MapsPage(BasePage):
@@ -73,29 +74,7 @@ class MapsPage(BasePage):
 
     def dismiss_known_onboarding(self, permission: Literal["allow", "deny"] = "deny") -> bool:
         """Dismiss only recognized Maps prompts; leave unexpected alerts to fail."""
-        alerts = self.driver.find_elements(self.By.CLASS_NAME, "XCUIElementTypeAlert")
-        for alert in alerts:
-            if not alert.is_displayed():
-                continue
-            # iOS 27 permission alerts and buttons are named by service ID
-            # (kTCCServiceAddressBook-staged-alert); labels carry the visible text.
-            title = alert.get_attribute("label") or alert.get_attribute("name") or ""
-            if title == "Allow “Maps” to use your location?":
-                button = "Allow While Using App" if permission == "allow" else "Don’t Allow"
-            elif title == "Allow widgets from “Maps” to use your location?":
-                button = "Allow" if permission == "allow" else "Don’t Allow"
-            elif title in (
-                "“Maps” Would Like to Send You Notifications",
-                "Allow “Maps” to access your contacts?",
-            ):
-                button = "Don’t Allow"
-            elif title == "Getting There Safely":
-                button = "OK"
-            else:
-                raise AssertionError(f"Unexpected Maps alert: {title}")
-            alert.find_element(
-                self.By.IOS_PREDICATE, f"type == 'XCUIElementTypeButton' AND label == '{button}'"
-            ).click()
+        if answer_system_prompt(self.driver, "Maps", permission):
             return True
         for heading, buttons in (
             ("Get Notified When Friends Share Their ETAs", ("Dismiss", "Not Now")),

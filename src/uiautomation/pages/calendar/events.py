@@ -9,8 +9,8 @@ from selenium.common.exceptions import StaleElementReferenceException
 from uiautomation.drivers.ios_driver import SystemApps
 from uiautomation.utils.app_launcher import AppLauncher
 
+from ..system_prompts import answer_system_prompt
 from .calendar_home import CalendarHomePage
-from .calendar_onboarding import CalendarOnboardingPage
 from .new_event import NewEventPage
 
 
@@ -57,10 +57,8 @@ class CalendarEventsPage(CalendarHomePage):
                 continue
         return None
 
-    def _dismiss_notifications(self) -> bool:
-        if self._visible(CalendarOnboardingPage.NOTIFICATIONS_ALERT):
-            return CalendarOnboardingPage(self.driver).dismiss_notifications_permission()
-        return False
+    def _dismiss_prompt(self) -> bool:
+        return answer_system_prompt(self.driver, "Calendar")
 
     def _home_ready(self) -> bool:
         return bool(
@@ -74,10 +72,10 @@ class CalendarEventsPage(CalendarHomePage):
         )
 
     def wait_for_home(self) -> None:
-        """Wait through the observed notification prompt for an unobstructed day view."""
+        """Wait through known system prompts for an unobstructed day view."""
 
         def ready(_: WebDriver) -> bool:
-            if self._dismiss_notifications():
+            if self._dismiss_prompt():
                 return False
             return self._home_ready()
 
@@ -85,7 +83,7 @@ class CalendarEventsPage(CalendarHomePage):
 
     def close_to_home(self) -> None:
         """Close owned editor/detail states; finish only a deletion already verified here."""
-        self._dismiss_notifications()
+        self._dismiss_prompt()
         if self._visible(self.DELETE_SHEET):
             if self._pending_delete not in self.owned_titles:
                 raise AssertionError("Cannot confirm an unowned Calendar deletion")

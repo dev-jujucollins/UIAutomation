@@ -9,6 +9,7 @@ from appium.webdriver.webelement import WebElement
 from selenium.common.exceptions import StaleElementReferenceException
 
 from ..base_page import BasePage
+from ..system_prompts import answer_system_prompt
 
 if TYPE_CHECKING:
     from .calendar_home import CalendarHomePage
@@ -222,7 +223,6 @@ class NewEventPage(BasePage):
     def discard(self) -> None:
         """Close known draft/detail states and verify an unobstructed Calendar home."""
         from .calendar_home import CalendarHomePage
-        from .calendar_onboarding import CalendarOnboardingPage
 
         discard_changes = (self.By.ACCESSIBILITY_ID, "Discard Changes")
         detail_title = (self.By.ACCESSIBILITY_ID, "event-details-title-text")
@@ -239,8 +239,7 @@ class NewEventPage(BasePage):
         def dismiss_next(_: WebDriver) -> bool:
             nonlocal home_checks
             try:
-                if visible(CalendarOnboardingPage.NOTIFICATIONS_ALERT):
-                    CalendarOnboardingPage(self.driver).dismiss_notifications_permission()
+                if answer_system_prompt(self.driver, "Calendar"):
                     home_checks = 0
                     return False
                 button = visible(discard_changes)
