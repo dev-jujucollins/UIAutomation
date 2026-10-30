@@ -200,7 +200,7 @@ def test_empty_inventory_is_actionable() -> None:
     [
         (simulators.boot_simulator, ("id",), [30, 120]),
         (simulators.shutdown_simulator, ("id",), [30]),
-        (simulators.reset_simulator_app_state, ("id", ("app",)), [30, 30]),
+        (simulators.reset_simulator_app_state, ("id", ("app",)), [30, 30, 30, 30]),
     ],
 )
 def test_simulator_commands_have_bounded_timeouts(operation, args, timeouts) -> None:
@@ -216,3 +216,39 @@ def test_inventory_timeout_propagates_instead_of_selecting_fallback() -> None:
         with pytest.raises(subprocess.TimeoutExpired):
             simulators.get_preferred_simulator()
     assert run.call_args.kwargs["timeout"] == 30
+
+
+def test_preferred_name_wins_on_unpinned_runtime() -> None:
+    """A newer point runtime should still pick a preferred model, not the alphabetical max."""
+    devices = [
+        SimulatorDevice("iPhone Air", "air", "27.2", "Shutdown", True),
+        SimulatorDevice("iPhone 18 Pro Max", "max", "27.2", "Shutdown", True),
+        SimulatorDevice("iPhone 18 Pro", "pro", "27.2", "Shutdown", True),
+        SimulatorDevice("iPhone 17 Pro", "old", "26.4", "Shutdown", True),
+    ]
+    with patch.object(simulators, "list_available_simulators", return_value=devices):
+        assert get_preferred_simulator().udid == "pro"
+
+
+def test_iphone_18_pro_beats_other_pinned_models() -> None:
+    """An unpinned iPhone 18 Pro runtime still outranks an exactly pinned older model."""
+    devices = [
+        SimulatorDevice("iPhone 17 Pro", "old", "26.4", "Booted", True),
+        SimulatorDevice("iPhone 18 Pro", "pro", "27.2", "Shutdown", True),
+    ]
+    with patch.object(simulators, "list_available_simulators", return_value=devices):
+        assert get_preferred_simulator().udid == "pro"
+
+
+def test_reset_denies_contacts_after_privacy_reset() -> None:
+    """Contacts denial must outlive the privacy reset so iOS 27 never stages the prompt."""
+    with patch("uiautomation.utils.simulator_control.subprocess.run") as subprocess_run:
+        reset_simulator_app_state("sim-udid", bundle_ids=("com.apple.mobilecal",))
+
+    commands = [call.args[0] for call in subprocess_run.call_args_list]
+    reset = commands.index(
+        ["xcrun", "simctl", "privacy", "sim-udid", "reset", "all", "com.apple.mobilecal"]
+    )
+    for bundle_id in ("com.apple.mobilecal", "com.apple.Maps"):
+        revoke = ["xcrun", "simctl", "privacy", "sim-udid", "revoke", "contacts", bundle_id]
+        assert commands.index(revoke) > reset

@@ -129,9 +129,10 @@ class NewEventPage(BasePage):
         self.wait_for_visible(self.ALL_DAY_SWITCH)
 
     def toggle_all_day(self) -> None:
-        """Toggle the All-day switch."""
+        """Toggle the All-day switch once and wait until it reports the new state."""
         self.expand_date_time()
         switch = self.find_element(self.ALL_DAY_SWITCH)
+        expected = "0" if switch.get_attribute("value") == "1" else "1"
         # iOS 27 exposes the whole row as a switch; tap its nested toggle.
         toggles = [
             element
@@ -139,6 +140,8 @@ class NewEventPage(BasePage):
             if element.id != switch.id
         ]
         (toggles[0] if toggles else switch).click()
+        # iOS 27.2 refreshes the switch value asynchronously; never re-tap while waiting.
+        self.wait_for_attribute(self.ALL_DAY_SWITCH, "value", expected)
 
     def enable_all_day(self) -> None:
         """Enable All-day if not already enabled."""

@@ -21,7 +21,11 @@ class MapsPage(BasePage):
     PLACE = (BasePage.By.ACCESSIBILITY_ID, "PlaceHeaderView")
     DIRECTIONS = (BasePage.By.ACCESSIBILITY_ID, "ActionRowItemTypeDirections")
     ROUTE = (BasePage.By.ACCESSIBILITY_ID, "IOSRoutePlanningOverview")
-    CARD_CLOSE = (BasePage.By.ACCESSIBILITY_ID, "CardButtonTypeClose")
+    # iOS 27.2 replaced CardButtonTypeClose with "close" (place) and "CloseButton" (directions).
+    CARD_CLOSE = (
+        BasePage.By.IOS_PREDICATE,
+        "type == 'XCUIElementTypeButton' AND name IN {'CardButtonTypeClose', 'close', 'CloseButton'}",
+    )
     SEARCH_CLOSE = (BasePage.By.ACCESSIBILITY_ID, "Close")
     SEARCH_SUBMIT = (BasePage.By.ACCESSIBILITY_ID, "Search")
     SEARCH_SUGGESTIONS = (
@@ -73,18 +77,25 @@ class MapsPage(BasePage):
         for alert in alerts:
             if not alert.is_displayed():
                 continue
-            title = alert.get_attribute("name") or ""
+            # iOS 27 permission alerts and buttons are named by service ID
+            # (kTCCServiceAddressBook-staged-alert); labels carry the visible text.
+            title = alert.get_attribute("label") or alert.get_attribute("name") or ""
             if title == "Allow “Maps” to use your location?":
                 button = "Allow While Using App" if permission == "allow" else "Don’t Allow"
             elif title == "Allow widgets from “Maps” to use your location?":
                 button = "Allow" if permission == "allow" else "Don’t Allow"
-            elif title == "“Maps” Would Like to Send You Notifications":
+            elif title in (
+                "“Maps” Would Like to Send You Notifications",
+                "Allow “Maps” to access your contacts?",
+            ):
                 button = "Don’t Allow"
             elif title == "Getting There Safely":
                 button = "OK"
             else:
                 raise AssertionError(f"Unexpected Maps alert: {title}")
-            alert.find_element(self.By.ACCESSIBILITY_ID, button).click()
+            alert.find_element(
+                self.By.IOS_PREDICATE, f"type == 'XCUIElementTypeButton' AND label == '{button}'"
+            ).click()
             return True
         for heading, buttons in (
             ("Get Notified When Friends Share Their ETAs", ("Dismiss", "Not Now")),
