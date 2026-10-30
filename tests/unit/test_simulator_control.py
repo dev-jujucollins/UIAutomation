@@ -200,7 +200,7 @@ def test_empty_inventory_is_actionable() -> None:
     [
         (simulators.boot_simulator, ("id",), [30, 120]),
         (simulators.shutdown_simulator, ("id",), [30]),
-        (simulators.reset_simulator_app_state, ("id", ("app",)), [30, 30, 30, 30]),
+        (simulators.reset_simulator_app_state, ("id", ("app",)), [30, 30, 30, 30, 30]),
     ],
 )
 def test_simulator_commands_have_bounded_timeouts(operation, args, timeouts) -> None:
@@ -249,7 +249,7 @@ def test_reset_denies_contacts_after_privacy_reset() -> None:
     reset = commands.index(
         ["xcrun", "simctl", "privacy", "sim-udid", "reset", "all", "com.apple.mobilecal"]
     )
-    for bundle_id in ("com.apple.mobilecal", "com.apple.Maps"):
+    for bundle_id in ("com.apple.mobilecal", "com.apple.Maps", "com.apple.reminders"):
         revoke = ["xcrun", "simctl", "privacy", "sim-udid", "revoke", "contacts", bundle_id]
         assert commands.index(revoke) > reset
 
