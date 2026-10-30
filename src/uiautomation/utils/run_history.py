@@ -2,6 +2,7 @@
 
 import json
 from collections import defaultdict
+from collections.abc import Set as AbstractSet
 from itertools import pairwise
 from pathlib import Path
 from statistics import median
@@ -127,3 +128,75 @@ def format_history(report: dict[str, Any], limit: int, flaky: bool = False) -> s
             f"median {row['median_seconds']}s (setup {row['median_setup_seconds']}s){mixed}"
         )
     return "\n".join(lines)
+
+
+# Recorded pytest options that reproduce a run; numprocesses is left out so reruns stay serial.
+_RERUN_FLAGS = (
+    "run_integration",
+    "run_diagnostics",
+    "run_lifecycle",
+    "run_maps_navigation",
+    "headless_simulator",
+    "restart_simulator",
+    "no_reset",
+    "skip_simulator_state_reset",
+)
+
+
+def latest_run(root: Path) -> dict[str, Any] | None:
+    """Return the most recently finished controller manifest under ``root``."""
+    latest: dict[str, Any] | None = None
+    for path in root.rglob("run.json"):
+        try:
+            run = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        if (
+            isinstance(run, dict)
+            and isinstance(run.get("finished_at"), str)
+            and run.get("worker") is None
+            and isinstance(run.get("results"), list)
+            and (latest is None or run["finished_at"] > latest["finished_at"])
+        ):
+            latest = run
+    return latest
+
+
+def failed_tests(run: dict[str, Any]) -> list[str]:
+    """Test IDs that failed in any phase, in the order they ran."""
+    failed = [
+        result["nodeid"]
+        for result in run["results"]
+        if isinstance(result, dict) and result.get("outcome") == "failed"
+    ]
+    return list(dict.fromkeys(failed))
+
+
+def rerun_options(run: dict[str, Any], skip: AbstractSet[str] = frozenset()) -> list[str]:
+    """Rebuild the pytest options that selected the run's device and opt-in suites.
+
+    Args:
+        run: A finished run manifest.
+        skip: Options the caller sets explicitly; their recorded values are left out.
+    """
+    recorded = run.get("options") or {}
+    options = [
+        flag
+        for name in _RERUN_FLAGS
+        if recorded.get(name) is True and (flag := f"--{name.replace('_', '-')}") not in skip
+    ]
+    values: list[tuple[str, Any]] = [("--timeout", recorded.get("timeout"))]
+    target = run.get("target") or {}
+    if target.get("kind") == "simulator":
+        values += [
+            ("--device-name", target.get("device_name")),
+            ("--platform-version", target.get("platform_version")),
+        ]
+    for option, value in values:
+        if option in skip or value is None or isinstance(value, bool):
+            continue
+        if isinstance(value, int | float) and value > 0:
+            options += [option, f"{value:g}"]
+        elif isinstance(value, str) and value:
+            options += [option, value]
+    return options

@@ -79,6 +79,20 @@ they do not prove flakiness because code and environment can differ across runs.
 No retries run automatically. Extract multiple CI bundles under one artifact root
 to compare their manifests; keep each run's unique directory name.
 
+## Rerun failures
+
+```bash
+uv run uiautomation rerun
+uv run uiautomation rerun --timeout 600     # Options given now replace recorded ones
+```
+
+Finds the most recently finished run under `--artifacts-dir` and runs only the tests that
+failed in any phase (setup, call, or teardown), by exact test ID. The recorded simulator,
+iOS version, timeout, and opt-in flags (`--run-lifecycle`, `--run-diagnostics`, ...) are
+reapplied, so a lifecycle failure reruns as a lifecycle test. Reruns are serial. Each rerun
+writes its own manifest, so repeating `rerun` narrows to what still fails. Manifests do not
+store device UDIDs: after a physical-device run, pass `--udid` and `--team-id` again.
+
 ### Flaky tests
 
 ```bash
