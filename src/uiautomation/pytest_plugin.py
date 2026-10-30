@@ -1,6 +1,7 @@
 """Pytest options, policy hooks, failure artifacts, and app fixtures for iOS tests."""
 
 import logging
+import subprocess
 from collections.abc import Generator
 from pathlib import Path
 from time import time
@@ -17,6 +18,7 @@ from uiautomation.pages.maps import MapsPage
 from uiautomation.pages.messages import ComposeMessagePage, ConversationPage, MessagesHomePage
 from uiautomation.pages.settings import SettingsHomePage, WifiSettingsPage
 from uiautomation.utils.app_launcher import AppLauncher
+from uiautomation.utils.appium_service import is_local_appium_url
 from uiautomation.utils.failure_artifacts import artifact_links, capture_failure
 from uiautomation.utils.run_reporting import RunReport
 from uiautomation.utils.simulator_control import (
@@ -25,6 +27,7 @@ from uiautomation.utils.simulator_control import (
     reset_location_permission,
     set_simulator_location,
 )
+from uiautomation.utils.wda_setup import ensure_prebuilt_wda, has_prebuilt_wda
 
 # -------------------------------------------------------------------------
 # Configuration
@@ -185,6 +188,41 @@ def pytest_collection_finish(session: pytest.Session) -> None:
             raise pytest.UsageError(
                 "Parallel iOS tests are unsupported: use -n 0; unit tests may use -n auto."
             )
+    # fixturenames includes indirect fixtures, so this means "will start a session".
+    if _uses_prebuilt_wda(session.config) and any(
+        "ios_driver" in getattr(item, "fixturenames", ()) for item in session.items
+    ):
+        _prepare_wda(session.config)
+
+
+def _uses_prebuilt_wda(config: pytest.Config) -> bool:
+    """Simulator runs against a local Appium use a WDA build made before tests start."""
+    return (
+        bool(config.getoption("--run-integration"))
+        and not config.getoption("--udid")
+        and not config.option.collectonly
+        and is_local_appium_url(config.getoption("--appium-server"))
+    )
+
+
+def _prepare_wda(config: pytest.Config) -> None:
+    """Build WDA outside per-test timeouts; a first build takes minutes."""
+    derived_data = Path(IOSDriverConfig().derived_data_path or "").resolve()
+    if has_prebuilt_wda(derived_data):
+        return
+    reporter = config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is not None:
+        reporter.write_line(
+            "Building WebDriverAgent for simulators (first run or after an Xcode/Appium "
+            "update; up to 10 minutes)..."
+        )
+    try:
+        ensure_prebuilt_wda(derived_data)
+    except subprocess.CalledProcessError as error:
+        tail = "\n".join((error.stderr or error.stdout or "").splitlines()[-20:])
+        raise pytest.UsageError(f"WebDriverAgent build failed:\n{tail}") from error
+    except subprocess.TimeoutExpired as error:
+        raise pytest.UsageError("WebDriverAgent build exceeded 10 minutes.") from error
 
 
 @pytest.hookimpl(optionalhook=True)
@@ -229,6 +267,7 @@ def driver_config(request) -> IOSDriverConfig:
         restart_simulator=request.config.getoption("--restart-simulator"),
         open_simulator_app=not request.config.getoption("--headless-simulator"),
         appium_log_path=str(request.config.stash[RUN_DIRECTORY] / "appium.log"),
+        prebuild_wda_for_simulator=_uses_prebuilt_wda(request.config),
         udid=udid,
         xcode_org_id=team_id,
     )

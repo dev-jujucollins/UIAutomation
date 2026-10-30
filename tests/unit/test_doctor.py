@@ -3,7 +3,7 @@
 import json
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -262,3 +262,17 @@ def test_cli_passes_target_context_and_returns_success(
     assert exit_code == 0
     assert "iPhone 17 Pro" in capsys.readouterr().out
     environment["opener"].assert_called_once_with("http://localhost:4723/custom/status", timeout=3)
+
+
+@pytest.mark.parametrize(
+    "outcome, status",
+    [(True, "pass"), (False, "warn"), (FileNotFoundError("package.json"), "warn")],
+)
+def test_wda_build_check_never_fails_the_doctor(outcome, status) -> None:
+    report = doctor.DoctorReport()
+    side_effect = outcome if isinstance(outcome, Exception) else None
+    with patch.object(doctor, "has_prebuilt_wda", return_value=outcome, side_effect=side_effect):
+        doctor._check_wda_build(report)
+    (check,) = report.checks
+    assert (check.name, check.status) == ("WebDriverAgent build", status)
+    assert report.ok
