@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 from dataclasses import dataclass
+from itertools import takewhile
 from pathlib import Path
 from urllib.parse import quote
 
@@ -36,13 +37,20 @@ class SimulatorDevice:
 
 
 def _runtime_version(runtime_name: str) -> str | None:
-    """Extract iOS version from runtime name."""
+    """Extract iOS version from runtime name.
+
+    Device-specific runtimes append a hardware suffix
+    (``iOS-27-2-iPhone19-4``); only the leading numeric parts are the version.
+    """
     prefix = "com.apple.CoreSimulator.SimRuntime.iOS-"
     if runtime_name.startswith(prefix):
-        return runtime_name.removeprefix(prefix).replace("-", ".")
-    if runtime_name.startswith("iOS "):
-        return runtime_name.removeprefix("iOS ")
-    return None
+        parts = runtime_name.removeprefix(prefix).split("-")
+    elif runtime_name.startswith("iOS "):
+        parts = runtime_name.removeprefix("iOS ").split(".")
+    else:
+        return None
+    version = ".".join(takewhile(str.isdigit, parts))
+    return version or None
 
 
 def list_available_simulators() -> list[SimulatorDevice]:
