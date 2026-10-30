@@ -60,6 +60,21 @@ def test_device_hub_launch_failure_propagates(tmp_path: Path, monkeypatch) -> No
             simulators.open_simulator_app("device")
 
 
+@pytest.mark.parametrize(
+    ("runtime", "expected"),
+    [
+        ("com.apple.CoreSimulator.SimRuntime.iOS-27-0", "27.0"),
+        ("com.apple.CoreSimulator.SimRuntime.iOS-27-2-iPhone19-4", "27.2"),
+        ("iOS 27.2", "27.2"),
+        ("com.apple.CoreSimulator.SimRuntime.watchOS-12-0", None),
+        ("com.apple.CoreSimulator.SimRuntime.iOS-beta", None),
+    ],
+)
+def test_runtime_version_ignores_hardware_suffix(runtime: str, expected: str | None) -> None:
+    """Device-specific runtimes report the plain iOS version."""
+    assert simulators._runtime_version(runtime) == expected
+
+
 def test_find_simulator_matches_exact_device_and_version() -> None:
     """Simulator lookup should require exact name and iOS version."""
     simulators = [
