@@ -1,9 +1,11 @@
 """Pytest options, policy hooks, failure artifacts, and app fixtures for iOS tests."""
 
 import base64
+import fcntl
 import logging
 import subprocess
 from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 from time import time
 from uuid import uuid4
@@ -21,14 +23,24 @@ from uiautomation.pages.settings import SettingsHomePage, WifiSettingsPage
 from uiautomation.utils.app_launcher import AppLauncher
 from uiautomation.utils.appium_service import is_local_appium_url
 from uiautomation.utils.failure_artifacts import artifact_links, capture_failure
+from uiautomation.utils.parallel import worker_slot
 from uiautomation.utils.run_reporting import RunReport
 from uiautomation.utils.simulator_control import (
+    boot_worker_simulator,
     clear_simulator_location,
+    ensure_worker_simulator,
     get_preferred_simulator,
     reset_location_permission,
+    reset_simulator_app_state,
     set_simulator_location,
+    stop_stray_wda,
 )
-from uiautomation.utils.wda_setup import ensure_prebuilt_wda, has_prebuilt_wda
+from uiautomation.utils.wda_setup import (
+    ensure_prebuilt_wda,
+    has_prebuilt_wda,
+    slot_wda_build,
+    slot_wda_path,
+)
 
 # -------------------------------------------------------------------------
 # Configuration
@@ -39,7 +51,16 @@ RUN_DIRECTORY = pytest.StashKey[Path]()
 ACTIVE_DRIVER = pytest.StashKey[WebDriver]()
 RUN_REPORT = pytest.StashKey[RunReport]()
 TEST_STARTED = pytest.StashKey[float]()
+SESSION_STARTING = pytest.StashKey[bool]()
+# ios_driver, plus fixtures that request it lazily via getfixturevalue.
+SESSION_FIXTURES = ("ios_driver", "maps_home", "lifecycle_simulator")
+CALENDAR_LAUNCH_TIMEOUT = 30
+# Extra time for the test that starts the Appium session: a new simulator's first
+# WebDriverAgent launch takes over a minute, more when several start at once.
+SESSION_START_BUDGET_SECONDS = 300
 APPLE_PARK_COORDINATES = (37.3349, -122.00902)
+# Opt-in suites that own data or guidance on one explicitly named simulator.
+SERIAL_ONLY_FLAGS = ("--run-lifecycle", "--run-maps-navigation")
 # Larger screenshots stay as links so emailed HTML reports fit the 10 MB attachment limit.
 MAX_EMBEDDED_SCREENSHOT_BYTES = 2 * 1024 * 1024
 
@@ -121,9 +142,27 @@ def pytest_addoption(parser):
 def pytest_configure(config: pytest.Config) -> None:
     """Assign a unique artifact location without touching the device."""
     if config.getoption("--run-integration") and config.getoption("numprocesses", default=0):
-        raise pytest.UsageError(
-            "Parallel iOS tests are unsupported: use -n 0; unit tests may use -n auto."
-        )
+        if config.getoption("--udid"):
+            raise pytest.UsageError("Physical devices run serially: use -n 0 with --udid.")
+        if not is_local_appium_url(config.getoption("--appium-server")):
+            raise pytest.UsageError(
+                "Parallel simulator runs start a local Appium per worker; "
+                "use -n 0 with a remote --appium-server."
+            )
+        # These suites only run when opted in, so rejecting the flags covers them before
+        # any worker starts (a worker-side error would crash xdist instead).
+        # "load" hands each worker a contiguous chunk up front, so one worker can own every
+        # slow device test while another finishes its unit tests and idles. Workstealing
+        # lets idle workers take queued tests. xdist reads this later (its configure is
+        # trylast); other explicit --dist modes are kept.
+        if config.getoption("dist", default=None) == "load":
+            config.option.dist = "worksteal"
+        serial_only = [flag for flag in SERIAL_ONLY_FLAGS if config.getoption(flag)]
+        if serial_only:
+            raise pytest.UsageError(
+                f"{', '.join(serial_only)} tests use one named simulator and run serially: "
+                "use -n 0."
+            )
     config.stash[RUN_DIRECTORY] = Path(config.getoption("--artifacts-dir")).resolve() / uuid4().hex
     recorder = RunReport(
         config.stash[RUN_DIRECTORY],
@@ -183,19 +222,51 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 
 def pytest_collection_finish(session: pytest.Session) -> None:
-    """Reject unsafe shared-device parallel runs before fixtures start."""
-    if session.config.getoption("numprocesses", default=0) or hasattr(
-        session.config, "workerinput"
-    ):
-        if any(item.get_closest_marker("integration") for item in session.items):
-            raise pytest.UsageError(
-                "Parallel iOS tests are unsupported: use -n 0; unit tests may use -n auto."
-            )
+    """Build WDA before fixtures start, outside per-test timeouts."""
     # fixturenames includes indirect fixtures, so this means "will start a session".
-    if _uses_prebuilt_wda(session.config) and any(
-        "ios_driver" in getattr(item, "fixturenames", ()) for item in session.items
-    ):
+    if _uses_prebuilt_wda(session.config) and any(map(_starts_session, session.items)):
         _prepare_wda(session.config)
+        _prepare_worker_simulator(session.config)
+
+
+def _prepare_worker_simulator(config: pytest.Config) -> None:
+    """Create and boot a parallel worker's simulator before any test timer starts.
+
+    A new simulator's first boot takes about 40 s, which would otherwise count against
+    the first test's timeout.
+    """
+    slot = worker_slot(config)
+    if slot is None:
+        return
+    base = get_preferred_simulator(
+        config.getoption("--device-name"), config.getoption("--platform-version")
+    )
+    # simctl calls from several workers at once can hang CoreSimulator for 30 s or more,
+    # so workers take turns preparing; the session then skips its own reset.
+    with _exclusive(_wda_derived_data().parent / ".simulator-prep.lock"):
+        worker = boot_worker_simulator(base, slot.index)
+        if _resets_simulator_state(config):
+            reset_simulator_app_state(worker.udid)
+    slot_wda_build(_wda_derived_data(), slot.index)
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Record the base target on a parallel run's controller, which starts no session."""
+    config = session.config
+    if not (
+        config.getoption("numprocesses", default=0)
+        and not hasattr(config, "workerinput")
+        and _uses_prebuilt_wda(config)
+    ):
+        return
+    try:
+        base = get_preferred_simulator(
+            config.getoption("--device-name"), config.getoption("--platform-version")
+        )
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        # Metadata only: workers report the real failure when they resolve their target.
+        return
+    config.stash[RUN_REPORT].set_target(base.name, base.platform_version)
 
 
 def _uses_prebuilt_wda(config: pytest.Config) -> bool:
@@ -210,9 +281,33 @@ def _uses_prebuilt_wda(config: pytest.Config) -> bool:
 
 def _prepare_wda(config: pytest.Config) -> None:
     """Build WDA outside per-test timeouts; a first build takes minutes."""
-    derived_data = Path(IOSDriverConfig().derived_data_path or "").resolve()
+    derived_data = _wda_derived_data()
     if has_prebuilt_wda(derived_data):
         return
+    # Parallel workers collect at the same time: one builds, the rest wait and reuse it.
+    with _exclusive(derived_data.parent / ".wda-build.lock"):
+        if not has_prebuilt_wda(derived_data):
+            _build_wda(config, derived_data)
+
+
+@contextmanager
+def _exclusive(lock_path: Path) -> Generator[None, None, None]:
+    """Hold a lock shared by all pytest processes on this machine."""
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
+def _resets_simulator_state(config: pytest.Config) -> bool:
+    return not (config.getoption("--skip-simulator-state-reset") or config.getoption("--no-reset"))
+
+
+def _wda_derived_data() -> Path:
+    return Path(IOSDriverConfig().derived_data_path or "").resolve()
+
+
+def _build_wda(config: pytest.Config, derived_data: Path) -> None:
     reporter = config.pluginmanager.get_plugin("terminalreporter")
     if reporter is not None:
         reporter.write_line(
@@ -252,8 +347,14 @@ def driver_config(request) -> IOSDriverConfig:
     device_name = request.config.getoption("--device-name")
     platform_version = request.config.getoption("--platform-version")
 
+    slot = worker_slot(request.config)
+    appium_server_url = request.config.getoption("--appium-server")
     if udid is None:
         preferred_simulator = get_preferred_simulator(device_name, platform_version)
+        if slot is not None:
+            # Each parallel worker gets its own simulator of the same model and runtime.
+            preferred_simulator = ensure_worker_simulator(preferred_simulator, slot.index)
+            appium_server_url = slot.appium_url
         device_name = preferred_simulator.name
         platform_version = preferred_simulator.platform_version
     else:
@@ -264,9 +365,16 @@ def driver_config(request) -> IOSDriverConfig:
     config = IOSDriverConfig(
         device_name=device_name,
         platform_version=platform_version,
-        appium_server_url=request.config.getoption("--appium-server"),
+        appium_server_url=appium_server_url,
+        wda_local_port=slot.wda_port if slot else None,
+        derived_data_path=str(
+            slot_wda_path(_wda_derived_data(), slot.index) if slot else _wda_derived_data()
+        ),
+        mjpeg_server_port=slot.mjpeg_port if slot else None,
         no_reset=request.config.getoption("--no-reset"),
-        reset_simulator_state=not request.config.getoption("--skip-simulator-state-reset"),
+        # Parallel workers were reset during collection (see _prepare_worker_simulator).
+        reset_simulator_state=slot is None
+        and not request.config.getoption("--skip-simulator-state-reset"),
         restart_simulator=request.config.getoption("--restart-simulator"),
         open_simulator_app=not request.config.getoption("--headless-simulator"),
         appium_log_path=str(request.config.stash[RUN_DIRECTORY] / "appium.log"),
@@ -285,19 +393,31 @@ def driver_config(request) -> IOSDriverConfig:
 
 
 @pytest.fixture(scope="session")
-def ios_driver(driver_config: IOSDriverConfig) -> Generator[IOSDriver, None, None]:
+def ios_driver(
+    request: pytest.FixtureRequest, driver_config: IOSDriverConfig
+) -> Generator[IOSDriver, None, None]:
     """
     Create and manage iOS driver session for entire test session.
 
     Yields:
         IOSDriver instance.
     """
+    # Only the first test to request the session gets the start-up budget.
+    request.config.stash[SESSION_STARTING] = True
     driver = IOSDriver(config=driver_config)
     try:
         driver.start()
         yield driver
     finally:
         driver.quit()
+        # Workers stay booted like the main simulator: a rebooted worker's next session
+        # takes ~90 s instead of ~30 s. Appium leaves WDA's xcodebuild running, which
+        # makes the next run's simctl calls hang, so stop it.
+        if worker_slot(request.config) is not None and driver_config.udid:
+            try:
+                stop_stray_wda(driver_config.udid)
+            except (OSError, subprocess.SubprocessError):
+                logging.getLogger(__name__).exception("Unable to stop worker WebDriverAgent")
 
 
 @pytest.fixture(scope="function")
@@ -380,7 +500,11 @@ def calendar_home(
 
     # Handle onboarding screens (location permission, notifications, etc.)
     onboarding = CalendarOnboardingPage(driver)
-    assert onboarding.dismiss_all_onboarding(), "Failed to dismiss Calendar onboarding"
+    # A cold first launch on a new or busy simulator exceeds the default 10 s wait; the
+    # wait ends as soon as home appears.
+    assert onboarding.dismiss_all_onboarding(timeout=CALENDAR_LAUNCH_TIMEOUT), (
+        "Failed to dismiss Calendar onboarding"
+    )
 
     calendar_page = CalendarHomePage(driver)
     assert calendar_page.is_on_calendar_home(), "Failed to reach Calendar home"
@@ -605,6 +729,34 @@ def pytest_runtest_makereport(item, call):
                 )
         except Exception:
             logging.getLogger(__name__).exception("Unable to save failure artifacts")
+
+
+def _starts_session(item: pytest.Item) -> bool:
+    """Whether running this test can start the shared Appium session.
+
+    ``fixturenames`` covers static and indirect requests; SESSION_FIXTURES covers plugin
+    fixtures that load ``driver`` lazily so they can skip or check guards first.
+    """
+    return any(name in getattr(item, "fixturenames", ()) for name in SESSION_FIXTURES)
+
+
+@pytest.hookimpl(wrapper=True, tryfirst=True)
+def pytest_runtest_protocol(item: pytest.Item, nextitem: pytest.Item | None):
+    """Give the test that starts the shared session extra time, before pytest-timeout reads it."""
+    if (
+        _starts_session(item)
+        and not item.config.stash.get(SESSION_STARTING, False)
+        and item.config.pluginmanager.hasplugin("timeout")
+    ):
+        marker = item.get_closest_marker("timeout")
+        base = marker.args[0] if marker and marker.args else item.config.getoption("timeout")
+        if base is None:
+            base = item.config.getini("timeout")
+        if base and float(base) > 0:
+            item.add_marker(
+                pytest.mark.timeout(float(base) + SESSION_START_BUDGET_SECONDS), append=False
+            )
+    return (yield)
 
 
 def pytest_terminal_summary(terminalreporter) -> None:

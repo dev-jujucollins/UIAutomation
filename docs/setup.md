@@ -34,6 +34,42 @@ Without options the default is iPhone 18 Pro on its pinned runtime, or on the ne
 one. Pass the same `--device-name` / `--platform-version` to any suite command to change the
 target; `devices` resolves them exactly as a run does and exits 1 when nothing matches.
 
+## Run simulator tests in parallel
+
+```bash
+uv run uiautomation all -n 2
+uv run uiautomation smoke -n 2 --device-name "iPhone 18 Pro Max"
+```
+
+Each pytest-xdist worker gets its own simulator, Appium server, and WebDriverAgent copy:
+
+- **Simulator:** `UIAutomation Worker <n> – <model> <iOS>`, created the first time with
+  the same model and runtime as the run's target (`uiautomation devices` shows it). Workers
+  stay booted between runs like the main simulator; a rebooted worker's first session
+  takes ~90 s instead of ~30 s. Each uses ~350 MB of disk and 1-2 GB of RAM while booted.
+  Shut them down or `xcrun simctl delete` them when finished; a worker that cannot boot
+  is deleted and recreated automatically.
+- **Ports:** worker `n` uses Appium `4730+n`, WebDriverAgent `8110+n`, and MJPEG `9110+n`,
+  so workers never collide with each other or with a serial run on the defaults.
+- **WebDriverAgent:** one build, cloned per worker with APFS copy-on-write
+  (`artifacts/wda-derived-data-slot<n>`); concurrent `xcodebuild` runs sharing one folder
+  stall.
+- **Setup order:** before any test timer starts, workers build WebDriverAgent (one at a
+  time, under a lock), boot their simulator, and reset app state (also one at a time:
+  simultaneous `simctl` calls can hang CoreSimulator). The first test to start a session
+  gets 300 s extra for the first WebDriverAgent launch on a new simulator.
+- **Scheduling:** parallel device runs use `--dist worksteal`, so an idle worker takes
+  queued tests from a busy one. With the default `load`, one worker could receive every
+  device test while the other finished the unit tests and idled.
+
+On an 8-core, 16 GB Mac, `uiautomation all` took 7.6 min with `-n 2` against 11-12 min
+serially. A first run with new workers adds about 3 minutes. More workers than CPU and memory
+allow slow every test down; start with 2.
+
+Parallel runs refuse physical devices (`--udid`), remote Appium servers, and
+`--run-lifecycle` / `--run-maps-navigation`, which own data or guidance on one named
+simulator.
+
 ## Check a machine before running iOS tests
 
 ```bash

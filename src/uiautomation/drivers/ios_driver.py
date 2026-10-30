@@ -24,6 +24,7 @@ from uiautomation.utils.simulator_control import (
     open_simulator_app,
     reset_simulator_app_state,
     shutdown_simulator,
+    stop_stray_wda,
 )
 from uiautomation.utils.wda_setup import ensure_prebuilt_wda
 
@@ -83,6 +84,10 @@ class IOSDriverConfig:
 
     # Optional: Use pre-built WebDriverAgent (speeds up test start)
     use_prebuilt_wda: bool = False
+
+    # Device-side ports; set per slot when several sessions run at once.
+    wda_local_port: int | None = None
+    mjpeg_server_port: int | None = None
 
 
 class IOSDriver:
@@ -153,6 +158,11 @@ class IOSDriver:
                 options.set_capability("xcodeOrgId", self.config.xcode_org_id)
                 options.set_capability("xcodeSigningId", self.config.xcode_signing_id)
 
+        if self.config.wda_local_port is not None:
+            options.set_capability("wdaLocalPort", self.config.wda_local_port)
+        if self.config.mjpeg_server_port is not None:
+            options.set_capability("mjpegServerPort", self.config.mjpeg_server_port)
+
         # Use pre-built WDA for faster startup
         if self.config.use_prebuilt_wda and self.config.derived_data_path:
             options.set_capability("usePrebuiltWDA", True)
@@ -174,6 +184,7 @@ class IOSDriver:
             raise RuntimeError(
                 f"Simulator not found for {self.config.device_name} iOS {self.config.platform_version}."
             )
+        stop_stray_wda(simulator.udid)
 
         if self.config.reset_simulator_state and not self.config.no_reset:
             if self.config.restart_simulator and simulator.state != "Shutdown":

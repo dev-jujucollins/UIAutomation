@@ -68,3 +68,15 @@ def test_build_failure_stops_the_run_with_xcodebuild_output() -> None:
     ):
         with pytest.raises(pytest.UsageError, match="BUILD FAILED"):
             pytest_plugin.pytest_collection_finish(session)
+
+
+@pytest.mark.parametrize("fixture", ["maps_home", "lifecycle_simulator"])
+def test_fixtures_that_load_the_driver_lazily_still_count(fixture: str) -> None:
+    """maps_home and lifecycle tests request driver via getfixturevalue, not fixturenames."""
+    session = _session((fixture,))
+    with (
+        patch.object(pytest_plugin, "has_prebuilt_wda", return_value=False),
+        patch.object(pytest_plugin, "ensure_prebuilt_wda") as build,
+    ):
+        pytest_plugin.pytest_collection_finish(session)
+    build.assert_called_once()

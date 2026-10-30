@@ -127,7 +127,7 @@ def test_sample(prepared):
     assert artifacts[0].with_name("page.xml").exists()
 
 
-def test_device_tests_are_opt_in_and_parallel_device_runs_rejected(harness) -> None:
+def test_device_tests_are_opt_in(harness) -> None:
     """Policy must take effect before any device fixture can run."""
     harness.makepyfile("""
 import pytest
@@ -138,9 +138,49 @@ def test_device():
     raise AssertionError("Device test executed")
 """)
     harness.runpytest_subprocess("-q").assert_outcomes(passed=1, deselected=1)
-    result = harness.runpytest_subprocess("--run-integration", "-n", "2", "-q")
+
+
+@pytest.mark.parametrize(
+    "marker, options, message",
+    [
+        ("lifecycle", ("--run-lifecycle",), "--run-lifecycle tests use one named simulator"),
+        (
+            "maps_navigation",
+            ("--run-maps-navigation",),
+            "--run-maps-navigation tests use one named simulator",
+        ),
+        (None, ("--udid", "phone"), "Physical devices run serially"),
+        (None, ("--appium-server", "http://ci-host:4723"), "start a local Appium per worker"),
+    ],
+)
+def test_parallel_device_runs_reject_serial_only_targets(harness, marker, options, message) -> None:
+    """Shared-state tests, physical devices, and remote Appium never run under -n."""
+    decorator = f"@pytest.mark.{marker}\n" if marker else ""
+    harness.makeini(
+        "[pytest]\nmarkers =\n unit\n integration\n diagnostic\n real_device\n journey\n"
+        " lifecycle\n maps_navigation\n"
+    )
+    harness.makepyfile(f"""
+import pytest
+@pytest.mark.integration
+{decorator}def test_device():
+    raise AssertionError("Device test executed")
+""")
+    result = harness.runpytest_subprocess("--run-integration", "-n", "2", "-q", *options)
     assert result.ret != 0
-    assert "Parallel iOS tests are unsupported" in result.stdout.str() + result.stderr.str()
+    assert message in result.stdout.str() + result.stderr.str()
+
+
+def test_parallel_device_tests_without_a_driver_run(harness) -> None:
+    """Parallel device runs are allowed; tests that start no session build nothing."""
+    harness.makepyfile("""
+import pytest
+@pytest.mark.integration
+@pytest.mark.parametrize("case", range(4))
+def test_device(case): pass
+""")
+    harness.runpytest_subprocess("--run-integration", "-n", "2", "-q").assert_outcomes(passed=4)
+    assert not (harness.path / "artifacts" / "wda-derived-data").exists()
 
 
 def test_diagnostics_require_opt_in_before_fixture_setup(harness: pytest.Pytester) -> None:
@@ -380,3 +420,36 @@ def test_html_report_embeds_only_small_screenshots(harness, size: int, embedded:
     html = (harness.path / "report.html").read_text()
     assert ("data:image/png;base64," in html) is embedded
     assert "screen.png" in html and "page.xml" in html
+
+
+@pytest.mark.parametrize("fixture", ["ios_driver", "maps_home"])
+def test_session_start_gets_extra_time_once(harness, fixture: str) -> None:
+    """Only the first test to start the shared session gets the start-up budget."""
+    harness.makepyfile(f"""
+import time, pytest
+from uiautomation.pytest_plugin import SESSION_STARTING
+@pytest.fixture(scope="session")
+def {fixture}(request):
+    request.config.stash[SESSION_STARTING] = True
+    time.sleep(2)
+def test_first({fixture}): pass
+def test_second({fixture}): time.sleep(2)
+""")
+    result = harness.runpytest_subprocess("--timeout=1", "-q")
+    result.assert_outcomes(passed=1, failed=1)
+    output = result.stdout.str()
+    assert "_ test_second _" in output and "Timeout (>1.0s)" in output
+
+
+def test_parallel_device_runs_use_workstealing(harness) -> None:
+    """Default load chunks can strand every slow device test on one worker."""
+    harness.makeconftest(
+        (ROOT / "conftest.py").read_text() + "\ndef pytest_sessionstart(session):\n"
+        "    if not hasattr(session.config, 'workerinput'):\n"
+        "        print('DIST=' + session.config.option.dist)\n"
+    )
+    harness.makepyfile("def test_unit(): pass")
+    output = harness.runpytest_subprocess("--run-integration", "-n", "2", "-s").stdout.str()
+    assert "DIST=worksteal" in output
+    unit_only = harness.runpytest_subprocess("-n", "2", "-s").stdout.str()
+    assert "DIST=load" in unit_only

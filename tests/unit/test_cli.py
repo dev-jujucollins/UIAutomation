@@ -108,3 +108,10 @@ def test_invalid_options_fail_before_starting_tests(monkeypatch, options):
         cli.main(["smoke", *options])
     assert error.value.code == 2
     runner.assert_not_called()
+
+
+def test_workers_option_forwards_to_pytest(monkeypatch):
+    runner = MagicMock(return_value=0)
+    monkeypatch.setattr(cli, "run_suite", runner)
+    assert cli.main(["integration", "-n", "3", "-m", "smoke"]) == 0
+    assert runner.call_args.args[1] == ["-n", "3", "-m", "smoke"]
