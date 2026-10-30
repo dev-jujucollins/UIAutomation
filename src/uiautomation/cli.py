@@ -8,7 +8,7 @@ from pathlib import Path
 
 from uiautomation.utils.doctor import diagnose_environment, format_report
 from uiautomation.utils.local_runner import SUITES, run_suite
-from uiautomation.utils.run_history import format_history, summarize_history
+from uiautomation.utils.run_history import flaky_tests, format_history, summarize_history
 
 _VALUE_OPTIONS = {
     "--device-name": "Exact simulator or physical-device name",
@@ -95,6 +95,10 @@ def main(argv: list[str] | None = None) -> int:
     history.add_argument("--artifacts-dir", type=Path, default=Path("artifacts"))
     history.add_argument("--limit", type=int, default=10)
     history.add_argument("--json", action="store_true")
+    history.add_argument(
+        "--flaky", action="store_true", help="Only tests that both passed and failed"
+    )
+    history.add_argument("--runs", type=int, help="Only the most recent N completed runs")
     doctor = commands.add_parser("doctor", help="Check local simulator test prerequisites")
     doctor.add_argument(
         "--device-name", help="Exact simulator name (default: framework preference)"
@@ -129,13 +133,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "history":
         if args.limit < 1:
             parser.error("--limit must be positive")
+        if args.runs is not None and args.runs < 1:
+            parser.error("--runs must be positive")
         if not args.artifacts_dir.is_dir():
             parser.error("--artifacts-dir must be an existing directory")
-        history_report = summarize_history(args.artifacts_dir)
+        history_report = summarize_history(args.artifacts_dir, args.runs)
+        if args.json and args.flaky:
+            history_report["tests"] = flaky_tests(history_report)
         print(
             json.dumps(history_report, indent=2)
             if args.json
-            else format_history(history_report, args.limit)
+            else format_history(history_report, args.limit, args.flaky)
         )
         return 0
     report = diagnose_environment(
