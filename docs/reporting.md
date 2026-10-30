@@ -43,10 +43,15 @@ uv run pytest --run-integration -m smoke -n 0 --platform-version 27.0 \
   --junitxml=reports/simulator.xml --timeout=600
 ```
 
-On failure, each HTML result has links to the available `screen.png`, `page.xml`,
-`appium.log`, and `failure.json`. Links are relative to the report, so the HTML and
-the artifact tree can move together. `--self-contained-html` embeds report assets;
-failure evidence remains separate linked files. Download/extract the complete CI
+On failure, each HTML result shows the screenshot inline and links to the available
+`screen.png`, `page.xml`, `appium.log`, and `failure.json`. Links are relative to the
+report, so the HTML and the artifact tree can move together. `--self-contained-html`
+embeds the screenshot itself (simulator screenshots are about 300 KB; ones over 2 MB stay
+links so emailed reports fit the 10 MB attachment limit); other evidence remains separate
+linked files.
+
+Every run, CLI or direct pytest, ends with a **Failure artifacts** section listing each
+failed test's `screen.png`, `page.xml`, and `failure.json` paths. Download/extract the complete CI
 bundle and open `reports/unit.html` or `reports/simulator.html` locally.
 
 Failure capture runs independently for screenshots, XML, and logs. Missing
