@@ -110,7 +110,20 @@ def get_preferred_simulator(
     device_name: str | None = None, platform_version: str | None = None
 ) -> SimulatorDevice:
     """Rank available simulators after applying all explicit target constraints."""
-    available = [device for device in list_available_simulators() if device.is_available]
+    return select_simulator(list_available_simulators(), device_name, platform_version)[0]
+
+
+def select_simulator(
+    devices: list[SimulatorDevice],
+    device_name: str | None = None,
+    platform_version: str | None = None,
+) -> tuple[SimulatorDevice, str]:
+    """Pick the run target from ``devices`` and say why it won.
+
+    Raises:
+        RuntimeError: If no available simulator satisfies the constraints.
+    """
+    available = [device for device in devices if device.is_available]
     simulators = [
         device
         for device in available
@@ -125,21 +138,39 @@ def get_preferred_simulator(
             f"No available simulator matches name={device_name!r}, iOS={platform_version!r}. "
             f"Available: {choices or 'none'}."
         )
+    constraints = [
+        option
+        for option, value in (
+            ("--device-name", device_name),
+            ("--platform-version", platform_version),
+        )
+        if value is not None
+    ]
+    matched = f"matches {' and '.join(constraints)}; " if constraints else ""
 
     # Model order decides first, so iPhone 18 Pro wins on any installed runtime.
     for preferred_name in dict.fromkeys(name for name, _ in PREFERRED_SIMULATORS):
         candidates = [device for device in simulators if device.name == preferred_name]
         if candidates:
             pinned = {version for name, version in PREFERRED_SIMULATORS if name == preferred_name}
-            return max(
+            chosen = max(
                 candidates,
-                key=lambda device: (device.platform_version in pinned, _version_key(device)),
+                key=lambda device: (device.platform_version in pinned, version_key(device)),
             )
+            runtime = (
+                "its pinned runtime"
+                if chosen.platform_version in pinned
+                else "the newest installed runtime"
+            )
+            return chosen, f"{matched}highest-ranked preferred model, on {runtime}"
 
-    return max(simulators, key=lambda device: (_version_key(device), device.name))
+    chosen = max(simulators, key=lambda device: (version_key(device), device.name))
+    if constraints:
+        return chosen, f"{matched}newest matching runtime"
+    return chosen, "no preferred model available; newest runtime"
 
 
-def _version_key(device: SimulatorDevice) -> tuple[int, ...]:
+def version_key(device: SimulatorDevice) -> tuple[int, ...]:
     """Order runtimes numerically so 27.10 sorts after 27.2."""
     return tuple(int(part) for part in device.platform_version.split("."))
 

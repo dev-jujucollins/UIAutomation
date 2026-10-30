@@ -22,6 +22,18 @@ download Xcode, runtimes, Appium, or drivers. Any iPhone simulator on iOS 27.0 w
 the [Maps](maps-testing.md), [Messages](messages-testing.md), and
 [lifecycle](lifecycle-testing.md) guides describe optional dedicated simulators.
 
+## Choose a simulator
+
+```bash
+uv run uiautomation devices
+uv run uiautomation devices --device-name "iPhone Air" --json
+```
+
+Lists available iPhone simulators by runtime, marks the one a run would use, and says why.
+Without options the default is iPhone 18 Pro on its pinned runtime, or on the newest installed
+one. Pass the same `--device-name` / `--platform-version` to any suite command to change the
+target; `devices` resolves them exactly as a run does and exits 1 when nothing matches.
+
 ## Check a machine before running iOS tests
 
 ```bash
