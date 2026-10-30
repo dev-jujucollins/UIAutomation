@@ -1,6 +1,7 @@
 """Report every renamed control on each app's main screens in one pass."""
 
 import pytest
+from appium.webdriver.webdriver import WebDriver
 
 from uiautomation.drivers.ios_driver import SystemApps
 from uiautomation.pages.base_page import BasePage
@@ -47,8 +48,8 @@ def test_messages_compose_locators(message_draft: ComposeMessagePage) -> None:
 
 
 @pytest.mark.contacts
-def test_contacts_list_locators(request: pytest.FixtureRequest) -> None:
-    page = ContactsPage(request.getfixturevalue("driver"))
+def test_contacts_list_locators(request: pytest.FixtureRequest, driver: WebDriver) -> None:
+    page = ContactsPage(driver)
     request.addfinalizer(lambda: page.launcher.terminate(SystemApps.CONTACTS))
     page.relaunch()
     page.wait_until_ready()

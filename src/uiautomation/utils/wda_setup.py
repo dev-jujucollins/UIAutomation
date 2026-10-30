@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -69,3 +70,29 @@ def ensure_prebuilt_wda(derived_data_path: Path) -> Path:
     )
     (derived_data_path / BUILD_STAMP).write_text(json.dumps(wda_build_identity()))
     return derived_data_path
+
+
+def slot_wda_path(derived_data_path: Path, slot: int) -> Path:
+    """Where a parallel slot keeps its copy of the WDA build."""
+    return derived_data_path.with_name(f"{derived_data_path.name}-slot{slot}")
+
+
+def slot_wda_build(derived_data_path: Path, slot: int) -> Path:
+    """Give a parallel slot its own copy of the current WDA build.
+
+    Concurrent ``xcodebuild test-without-building`` runs sharing one derived data folder
+    stall each other. ``cp -c`` makes an APFS copy-on-write clone: instant, and nearly free
+    on disk. The copied stamp makes a stale copy rebuild-free to replace.
+    """
+    target = slot_wda_path(derived_data_path, slot)
+    if has_prebuilt_wda(target):
+        return target
+    shutil.rmtree(target, ignore_errors=True)
+    subprocess.run(  # noqa: S603
+        ["cp", "-cR", str(derived_data_path), str(target)],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    return target

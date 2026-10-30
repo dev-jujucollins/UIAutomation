@@ -41,6 +41,9 @@ class SimulatorDevice:
     platform_version: str
     state: str
     is_available: bool
+    # simctl identifiers, needed to create a matching worker simulator.
+    runtime_id: str = ""
+    device_type_id: str = ""
 
 
 def _runtime_version(runtime_name: str) -> str | None:
@@ -88,6 +91,8 @@ def list_available_simulators() -> list[SimulatorDevice]:
                         platform_version=platform_version,
                         state=device["state"],
                         is_available=device.get("isAvailable", True),
+                        runtime_id=runtime_name,
+                        device_type_id=device.get("deviceTypeIdentifier", ""),
                     )
                 )
 
@@ -129,6 +134,8 @@ def select_simulator(
         for device in available
         if (device_name is None or device.name == device_name)
         and (platform_version is None or device.platform_version == platform_version)
+        # Parallel-run workers are never a default target.
+        and (device_name is not None or not device.name.startswith(WORKER_PREFIX))
     ]
     if not simulators:
         choices = ", ".join(
@@ -173,6 +180,85 @@ def select_simulator(
 def version_key(device: SimulatorDevice) -> tuple[int, ...]:
     """Order runtimes numerically so 27.10 sorts after 27.2."""
     return tuple(int(part) for part in device.platform_version.split("."))
+
+
+WORKER_PREFIX = "UIAutomation Worker "
+
+
+def worker_simulator_name(base: SimulatorDevice, slot: int) -> str:
+    """Name a worker by slot, model, and runtime so different targets never share one."""
+    return f"{WORKER_PREFIX}{slot} – {base.name} {base.platform_version}"
+
+
+def ensure_worker_simulator(base: SimulatorDevice, slot: int) -> SimulatorDevice:
+    """Return this slot's simulator of the same model and runtime, creating it once.
+
+    Workers are kept between runs: a new simulator's first boot takes about 40 s and
+    re-runs every app's first-launch onboarding, while a reboot takes a few seconds.
+    """
+    name = worker_simulator_name(base, slot)
+    for device in list_available_simulators():
+        if device.is_available and device.name == name and device.runtime_id == base.runtime_id:
+            return device
+    if not base.device_type_id or not base.runtime_id:
+        raise RuntimeError(f"Cannot create a worker for {base.name}: simctl identifiers unknown.")
+    udid = subprocess.run(  # noqa: S603
+        ["xcrun", "simctl", "create", name, base.device_type_id, base.runtime_id],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    ).stdout.strip()
+    return SimulatorDevice(
+        name, udid, base.platform_version, "Shutdown", True, base.runtime_id, base.device_type_id
+    )
+
+
+def boot_worker_simulator(base: SimulatorDevice, slot: int) -> SimulatorDevice:
+    """Boot this slot's worker, recreating it if it cannot boot.
+
+    Workers are disposable copies; an interrupted WebDriverAgent install can leave one
+    that never finishes booting.
+    """
+    worker = ensure_worker_simulator(base, slot)
+    stop_stray_wda(worker.udid)
+    try:
+        boot_simulator(worker.udid)
+        return worker
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        subprocess.run(  # noqa: S603
+            ["xcrun", "simctl", "shutdown", worker.udid],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        subprocess.run(  # noqa: S603
+            ["xcrun", "simctl", "delete", worker.udid],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    worker = ensure_worker_simulator(base, slot)
+    boot_simulator(worker.udid)
+    return worker
+
+
+def stop_stray_wda(udid: str) -> None:
+    """Stop WebDriverAgent ``xcodebuild`` runs left on this simulator by an interrupted run.
+
+    When a session start is interrupted, its ``xcodebuild test-without-building`` outlives
+    Appium and holds the device, so later ``simctl`` calls hang. Appium only clears these
+    when its next session starts, after our simulator reset has already blocked.
+    """
+    subprocess.run(  # noqa: S603
+        ["pkill", "-f", f"xcodebuild.*{udid}"],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
 
 
 def boot_simulator(udid: str) -> None:

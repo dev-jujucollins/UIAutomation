@@ -58,6 +58,11 @@ def _add_run_options(parser: argparse.ArgumentParser) -> None:
         parser.add_argument(option, help=help_text)
     for option, help_text in _FLAG_OPTIONS.items():
         parser.add_argument(option, action="store_true", help=help_text)
+    parser.add_argument(
+        "-n",
+        dest="workers",
+        help="Parallel workers; each simulator worker gets its own simulator and ports",
+    )
     parser.add_argument("-m", dest="markexpr", help="Filter tests by pytest marker expression")
     parser.add_argument("-k", dest="keyword", help="Filter tests by pytest name expression")
     parser.add_argument("-v", action="count", default=0, help="Increase pytest verbosity")
@@ -77,7 +82,7 @@ def _forward_options(args: argparse.Namespace) -> list[str]:
     for option in _FLAG_OPTIONS:
         if getattr(args, option[2:].replace("-", "_")):
             forwarded.append(option)
-    for option, value in (("-m", args.markexpr), ("-k", args.keyword)):
+    for option, value in (("-n", args.workers), ("-m", args.markexpr), ("-k", args.keyword)):
         if value is not None:
             forwarded.extend([option, value])
     forwarded.extend(["-v"] * args.v)
