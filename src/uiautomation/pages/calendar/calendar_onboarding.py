@@ -10,8 +10,8 @@ class CalendarOnboardingPage(BasePage):
     """
     Page object for Calendar app onboarding prompts.
 
-    Calendar asks for location and notification access on first launch, and iOS 27
-    adds a "What’s New in Calendar" sheet. The permissions are declined and the sheet
+    Calendar asks for location, notification, and contacts access on first launch, and
+    iOS 27 adds a "What’s New in Calendar" sheet. The permissions are declined and the sheet
     is continued past. Any other alert fails the run so new UI is inspected, not
     tapped through.
     """
@@ -106,12 +106,16 @@ class CalendarOnboardingPage(BasePage):
             try:
                 if not alert.is_displayed():
                     continue
-                title = alert.get_attribute("name") or ""
+                # iOS 27 permission alerts name themselves by service ID
+                # (kTCCServiceAddressBook-staged-alert); the label is the visible title.
+                title = alert.get_attribute("label") or alert.get_attribute("name") or ""
             except StaleElementReferenceException:
                 # The alert is animating away; check again on the next poll.
                 return False
             # Match on words, not exact titles, so curly or straight quotes both work.
-            if "Calendar" in title and ("location" in title or "Notifications" in title):
+            if "Calendar" in title and any(
+                word in title for word in ("location", "Notifications", "contacts")
+            ):
                 alert.find_element(*self.DONT_ALLOW_BUTTON).click()
                 return True
             raise AssertionError(f"Unexpected Calendar alert: {title}")

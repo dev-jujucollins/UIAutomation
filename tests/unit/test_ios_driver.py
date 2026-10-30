@@ -50,7 +50,8 @@ def test_ios_driver_prepares_simulator_and_local_appium() -> None:
     shutdown_simulator.assert_not_called()
     reset_simulator_state.assert_called_once_with("sim-udid")
     open_simulator_app.assert_called_once_with("sim-udid")
-    assert driver._build_options().to_capabilities()["appium:isHeadless"] is True
+    # Headless mode would make Appium quit Device Hub and reboot the simulator.
+    assert driver._build_options().to_capabilities()["appium:isHeadless"] is False
     service.stop.assert_not_called()
     driver.quit()
     service.stop.assert_called_once_with()

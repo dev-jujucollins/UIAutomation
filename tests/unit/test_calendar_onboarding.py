@@ -49,7 +49,7 @@ def test_known_permission_alerts_are_declined(title: str) -> None:
     alert.find_element.return_value.click.assert_called_once()
 
 
-@pytest.mark.parametrize("title", ["Calendar Would Like to Access Your Contacts", ""])
+@pytest.mark.parametrize("title", ["Allow “Calendar” to access your photos?", ""])
 def test_unknown_alert_fails_instead_of_tapping_through(title: str) -> None:
     alert = _alert(title)
     page = _page(alert)
@@ -90,3 +90,18 @@ def test_onboarding_reports_missing_home() -> None:
     page = _page()
     with patch.object(CalendarHomePage, "is_element_visible", return_value=False):
         assert page.dismiss_all_onboarding() is False
+
+
+def test_ios_27_contacts_alert_is_declined_by_label() -> None:
+    """iOS 27 names TCC alerts by service ID; only the label carries the visible title."""
+    alert = MagicMock()
+    alert.is_displayed.return_value = True
+    alert.get_attribute.side_effect = {
+        "name": "kTCCServiceAddressBook-staged-alert",
+        "label": "Allow “Calendar” to access your contacts?",
+    }.get
+    page = _page(alert)
+
+    assert page.dismiss_known_prompt() is True
+    alert.find_element.assert_called_once_with(*page.DONT_ALLOW_BUTTON)
+    alert.find_element.return_value.click.assert_called_once_with()

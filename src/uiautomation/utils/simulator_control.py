@@ -24,6 +24,13 @@ DEFAULT_RESET_BUNDLE_IDS: tuple[str, ...] = (
     "com.apple.mobilecal",
 )
 
+# iOS 27 asks Calendar and Maps for contacts through deferred system prompts that can
+# surface over any app mid-run. A recorded denial keeps the prompt from appearing.
+CONTACTS_DENIED_BUNDLE_IDS: tuple[str, ...] = (
+    "com.apple.mobilecal",
+    "com.apple.Maps",
+)
+
 
 @dataclass(frozen=True)
 class SimulatorDevice:
@@ -119,18 +126,22 @@ def get_preferred_simulator(
             f"Available: {choices or 'none'}."
         )
 
-    for name, version in PREFERRED_SIMULATORS:
-        for simulator in simulators:
-            if simulator.name == name and simulator.platform_version == version:
-                return simulator
+    # Model order decides first, so iPhone 18 Pro wins on any installed runtime.
+    for preferred_name in dict.fromkeys(name for name, _ in PREFERRED_SIMULATORS):
+        candidates = [device for device in simulators if device.name == preferred_name]
+        if candidates:
+            pinned = {version for name, version in PREFERRED_SIMULATORS if name == preferred_name}
+            return max(
+                candidates,
+                key=lambda device: (device.platform_version in pinned, _version_key(device)),
+            )
 
-    return max(
-        simulators,
-        key=lambda simulator: (
-            tuple(int(part) for part in simulator.platform_version.split(".")),
-            simulator.name,
-        ),
-    )
+    return max(simulators, key=lambda device: (_version_key(device), device.name))
+
+
+def _version_key(device: SimulatorDevice) -> tuple[int, ...]:
+    """Order runtimes numerically so 27.10 sorts after 27.2."""
+    return tuple(int(part) for part in device.platform_version.split("."))
 
 
 def boot_simulator(udid: str) -> None:
@@ -166,7 +177,10 @@ def reset_simulator_app_state(
     udid: str,
     bundle_ids: tuple[str, ...] = DEFAULT_RESET_BUNDLE_IDS,
 ) -> None:
-    """Terminate apps and reset permissions; persisted app data is not erased."""
+    """Terminate apps, reset permissions, then deny contacts to apps that would prompt.
+
+    Persisted app data is not erased.
+    """
     for bundle_id in bundle_ids:
         subprocess.run(  # noqa: S603
             ["xcrun", "simctl", "terminate", udid, bundle_id],
@@ -177,6 +191,15 @@ def reset_simulator_app_state(
         )
         subprocess.run(  # noqa: S603
             ["xcrun", "simctl", "privacy", udid, "reset", "all", bundle_id],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    # After the resets, which would otherwise clear Calendar's contacts denial.
+    for bundle_id in CONTACTS_DENIED_BUNDLE_IDS:
+        subprocess.run(  # noqa: S603
+            ["xcrun", "simctl", "privacy", udid, "revoke", "contacts", bundle_id],
             check=True,
             capture_output=True,
             text=True,

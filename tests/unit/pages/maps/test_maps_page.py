@@ -61,7 +61,9 @@ def test_location_decision_uses_matching_prompt(permission: str, button: str) ->
     alert.get_attribute.return_value = "Allow “Maps” to use your location?"
     page.driver.find_elements.return_value = [alert]
     assert page.dismiss_known_onboarding(permission)
-    alert.find_element.assert_called_once_with(page.By.ACCESSIBILITY_ID, button)
+    alert.find_element.assert_called_once_with(
+        page.By.IOS_PREDICATE, f"type == 'XCUIElementTypeButton' AND label == '{button}'"
+    )
 
 
 @pytest.mark.parametrize("permission,button", [("allow", "Allow"), ("deny", "Don’t Allow")])
@@ -71,7 +73,24 @@ def test_widgets_location_decision_uses_matching_prompt(permission: str, button:
     alert.get_attribute.return_value = "Allow widgets from “Maps” to use your location?"
     page.driver.find_elements.return_value = [alert]
     assert page.dismiss_known_onboarding(permission)
-    alert.find_element.assert_called_once_with(page.By.ACCESSIBILITY_ID, button)
+    alert.find_element.assert_called_once_with(
+        page.By.IOS_PREDICATE, f"type == 'XCUIElementTypeButton' AND label == '{button}'"
+    )
+
+
+def test_ios_27_contacts_alert_is_declined_by_label() -> None:
+    """iOS 27 names TCC alerts and buttons by service ID; labels carry the visible text."""
+    page = MapsPage(MagicMock())
+    alert = MagicMock()
+    alert.get_attribute.side_effect = {
+        "name": "kTCCServiceAddressBook-staged-alert",
+        "label": "Allow “Maps” to access your contacts?",
+    }.get
+    page.driver.find_elements.return_value = [alert]
+    assert page.dismiss_known_onboarding("allow")
+    alert.find_element.assert_called_once_with(
+        page.By.IOS_PREDICATE, "type == 'XCUIElementTypeButton' AND label == 'Don’t Allow'"
+    )
 
 
 def test_unexpected_alert_fails_without_accepting() -> None:

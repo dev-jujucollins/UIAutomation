@@ -140,8 +140,9 @@ class IOSDriver:
         options.set_capability("wdaLaunchTimeout", self.config.wda_launch_timeout)
         options.set_capability("wdaConnectionTimeout", self.config.wda_connection_timeout)
         options.set_capability("showXcodeLog", self.config.show_xcode_log)
-        # Device Hub owns the window; prevent Appium from launching Simulator.app.
-        options.set_capability("isHeadless", True)
+        # Match Appium's UI expectation to ours: in headless mode Appium quits the
+        # simulator UI client (Device Hub), shutting down and rebooting the device.
+        options.set_capability("isHeadless", not self.config.open_simulator_app)
 
         # Physical device configuration
         if self.config.udid:

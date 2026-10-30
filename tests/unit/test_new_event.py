@@ -52,7 +52,9 @@ def test_toggle_clicks_nested_control_or_legacy_switch(nested: bool, includes_se
     actions = MagicMock()
     page.expand_date_time = actions.expand
     page.find_element = actions.find
+    page.wait_for_attribute = actions.wait
     switch = actions.find.return_value
+    switch.get_attribute.return_value = "0"
     toggle = MagicMock()
     switch.find_elements.return_value = ([switch] if includes_self else []) + (
         [toggle] if nested else []
@@ -66,6 +68,8 @@ def test_toggle_clicks_nested_control_or_legacy_switch(nested: bool, includes_se
         switch.click.assert_not_called()
     else:
         switch.click.assert_called_once_with()
+    # The asynchronously refreshed value is awaited, never re-tapped.
+    actions.wait.assert_called_once_with(page.ALL_DAY_SWITCH, "value", "1")
 
 
 def test_title_input_requires_matching_value() -> None:

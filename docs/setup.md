@@ -82,8 +82,9 @@ For simulator runs, the framework:
 
 - Finds an existing target and boots it if needed.
 - Opens Device Hub from `DEVELOPER_DIR` or the Xcode selected by `xcode-select`.
-  `--headless-simulator` skips that window. Appium always receives `isHeadless=True`
-  so it does not attempt to open the removed Simulator.app.
+  `--headless-simulator` skips that window. Appium receives `isHeadless` to match:
+  windowed runs reuse the open Device Hub, while headless mode would make Appium quit
+  Device Hub and reboot the simulator without a window.
 - Starts local Appium if the configured local server is unavailable. An existing
   server is reused and supplies its own installed drivers.
 - By default, terminates Settings/Calendar and resets their privacy permissions
