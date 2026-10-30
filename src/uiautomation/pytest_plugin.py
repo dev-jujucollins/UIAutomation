@@ -1,5 +1,6 @@
 """Pytest options, policy hooks, failure artifacts, and app fixtures for iOS tests."""
 
+import base64
 import logging
 import subprocess
 from collections.abc import Generator
@@ -39,6 +40,8 @@ ACTIVE_DRIVER = pytest.StashKey[WebDriver]()
 RUN_REPORT = pytest.StashKey[RunReport]()
 TEST_STARTED = pytest.StashKey[float]()
 APPLE_PARK_COORDINATES = (37.3349, -122.00902)
+# Larger screenshots stay as links so emailed HTML reports fit the 10 MB attachment limit.
+MAX_EMBEDDED_SCREENSHOT_BYTES = 2 * 1024 * 1024
 
 
 def pytest_addoption(parser):
@@ -584,9 +587,40 @@ def pytest_runtest_makereport(item, call):
             if html_path and item.config.pluginmanager.hasplugin("html"):
                 from pytest_html import extras
 
-                report.extras = getattr(report, "extras", []) + [
-                    extras.url(url, name=name)
-                    for name, url in artifact_links(destination, Path(html_path).resolve())
-                ]
+                screen = destination / "screen.png"
+                # Base64 is embedded in self-contained reports and saved as an asset
+                # otherwise; oversized screenshots stay as links to keep emails small.
+                screenshot = (
+                    [extras.png(base64.b64encode(screen.read_bytes()).decode(), name="Screen")]
+                    if screen.is_file() and screen.stat().st_size <= MAX_EMBEDDED_SCREENSHOT_BYTES
+                    else []
+                )
+                report.extras = (
+                    getattr(report, "extras", [])
+                    + screenshot
+                    + [
+                        extras.url(url, name=name)
+                        for name, url in artifact_links(destination, Path(html_path).resolve())
+                    ]
+                )
         except Exception:
             logging.getLogger(__name__).exception("Unable to save failure artifacts")
+
+
+def pytest_terminal_summary(terminalreporter) -> None:
+    """List each failure's evidence after the run, instead of only inside its traceback."""
+    rows = [
+        (report.nodeid, report.when, Path(value))
+        for key in ("failed", "error")
+        for report in terminalreporter.stats.get(key, [])
+        for name, value in getattr(report, "user_properties", [])
+        if name == "failure_artifacts"
+    ]
+    if not rows:
+        return
+    terminalreporter.section("Failure artifacts")
+    for nodeid, phase, folder in rows:
+        terminalreporter.write_line(f"{nodeid} ({phase})")
+        for file in ("screen.png", "page.xml", "failure.json"):
+            if (folder / file).is_file():
+                terminalreporter.write_line(f"  {file:<12} {folder / file}")

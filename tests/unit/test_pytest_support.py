@@ -333,3 +333,50 @@ def test_failure(driver): assert False
         "00000000-0000-0000-0000-000000000001",
         "com.apple.mobilecal",
     ]
+
+
+_FAILING_WITH_SCREEN = """
+import pytest
+from pathlib import Path
+class Driver:
+    page_source = "<Application/>"
+    def save_screenshot(self, path):
+        Path(path).write_bytes(b"\\x89PNG" + b"0" * {size})
+        return True
+@pytest.fixture
+def driver(): return Driver()
+def test_broken(driver): assert False
+"""
+
+
+def test_failure_artifacts_are_listed_after_the_run(harness) -> None:
+    """The end of the run names each failure's screenshot and page source."""
+    harness.makepyfile(_FAILING_WITH_SCREEN.format(size=10))
+    result = harness.runpytest_subprocess("-q")
+    result.assert_outcomes(failed=1)
+    result.stdout.fnmatch_lines(
+        [
+            "*= Failure artifacts =*",
+            "test_failure_artifacts_are_listed_after_the_run.py::test_broken (call)",
+            "  screen.png   */screen.png",
+            "  page.xml     */page.xml",
+            "  failure.json */failure.json",
+        ]
+    )
+
+
+def test_passing_run_has_no_failure_artifact_section(harness) -> None:
+    harness.makepyfile("def test_ok(): pass")
+    assert "Failure artifacts" not in harness.runpytest_subprocess("-q").stdout.str()
+
+
+@pytest.mark.parametrize("size, embedded", [(10, True), (3 * 1024 * 1024, False)])
+def test_html_report_embeds_only_small_screenshots(harness, size: int, embedded: bool) -> None:
+    """Self-contained reports show the screen inline; large ones keep just the links."""
+    harness.makepyfile(_FAILING_WITH_SCREEN.format(size=size))
+    harness.runpytest_subprocess(
+        "-q", "--html", "report.html", "--self-contained-html"
+    ).assert_outcomes(failed=1)
+    html = (harness.path / "report.html").read_text()
+    assert ("data:image/png;base64," in html) is embedded
+    assert "screen.png" in html and "page.xml" in html
