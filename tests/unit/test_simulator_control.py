@@ -252,3 +252,34 @@ def test_reset_denies_contacts_after_privacy_reset() -> None:
     for bundle_id in ("com.apple.mobilecal", "com.apple.Maps"):
         revoke = ["xcrun", "simctl", "privacy", "sim-udid", "revoke", "contacts", bundle_id]
         assert commands.index(revoke) > reset
+
+
+@pytest.mark.parametrize(
+    "name, version, expected, reason",
+    [
+        (None, None, "pro", "highest-ranked preferred model, on the newest installed runtime"),
+        ("iPhone Air", None, "air", "matches --device-name; newest matching runtime"),
+        (
+            "iPhone 17 Pro",
+            "26.4",
+            "old",
+            "matches --device-name and --platform-version; "
+            "highest-ranked preferred model, on its pinned runtime",
+        ),
+    ],
+)
+def test_selection_explains_its_choice(name, version, expected, reason) -> None:
+    devices = [
+        SimulatorDevice("iPhone Air", "air", "27.2", "Booted", True),
+        SimulatorDevice("iPhone 18 Pro", "pro", "27.2", "Shutdown", True),
+        SimulatorDevice("iPhone 17 Pro", "old", "26.4", "Shutdown", True),
+    ]
+    chosen, why = simulators.select_simulator(devices, name, version)
+    assert (chosen.udid, why) == (expected, reason)
+
+
+def test_selection_without_preferred_models_says_so() -> None:
+    devices = [SimulatorDevice("Custom Phone", "c", "27.2", "Shutdown", True)]
+    assert simulators.select_simulator(devices)[1] == (
+        "no preferred model available; newest runtime"
+    )

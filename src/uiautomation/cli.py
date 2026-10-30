@@ -4,11 +4,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+from dataclasses import asdict
 from pathlib import Path
 
 from uiautomation.utils.doctor import diagnose_environment, format_report
 from uiautomation.utils.local_runner import SUITES, run_suite
 from uiautomation.utils.run_history import flaky_tests, format_history, summarize_history
+from uiautomation.utils.simulator_control import (
+    SimulatorDevice,
+    list_available_simulators,
+    select_simulator,
+    version_key,
+)
 
 _VALUE_OPTIONS = {
     "--device-name": "Exact simulator or physical-device name",
@@ -71,6 +79,32 @@ def _forward_options(args: argparse.Namespace) -> list[str]:
     return forwarded + (extra[1:] if extra[:1] == ["--"] else extra)
 
 
+def format_devices(
+    devices: list[SimulatorDevice], target: SimulatorDevice | None, reason: str
+) -> str:
+    """List available simulators by runtime, newest first, marking the run target."""
+    lines = []
+    if target is not None:
+        lines += [
+            f"Default target: {target.name} (iOS {target.platform_version}) {target.udid}",
+            f"  Why: {reason}",
+            "  Override with --device-name and/or --platform-version.",
+        ]
+    else:
+        lines.append(f"No target: {reason}")
+    runtime = None
+    # Newest runtime first, names alphabetical within each runtime.
+    ordered = sorted(devices, key=lambda device: device.name)
+    ordered.sort(key=version_key, reverse=True)
+    for device in ordered:
+        if device.platform_version != runtime:
+            runtime = device.platform_version
+            lines += ["", f"iOS {runtime}"]
+        marker = "→" if device == target else " "
+        lines.append(f"  {marker} {device.name:<28} {device.state:<9} {device.udid}")
+    return "\n".join(lines)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run a framework command and return its process exit code."""
     parser = argparse.ArgumentParser(prog="uiautomation", allow_abbrev=False)
@@ -100,6 +134,12 @@ def main(argv: list[str] | None = None) -> int:
         "--flaky", action="store_true", help="Only tests that both passed and failed"
     )
     history.add_argument("--runs", type=int, help="Only the most recent N completed runs")
+    devices = commands.add_parser(
+        "devices", help="List simulators and show which one a run would use"
+    )
+    devices.add_argument("--device-name", help="Exact simulator name to resolve")
+    devices.add_argument("--platform-version", help="Exact iOS runtime version to resolve")
+    devices.add_argument("--json", action="store_true", help="Print machine-readable results")
     doctor = commands.add_parser("doctor", help="Check local simulator test prerequisites")
     doctor.add_argument(
         "--device-name", help="Exact simulator name (default: framework preference)"
@@ -146,6 +186,31 @@ def main(argv: list[str] | None = None) -> int:
             if args.json
             else format_history(history_report, args.limit, args.flaky)
         )
+        return 0
+    if args.command == "devices":
+        available = [device for device in list_available_simulators() if device.is_available]
+        target: SimulatorDevice | None = None
+        try:
+            target, reason = select_simulator(available, args.device_name, args.platform_version)
+        except RuntimeError as error:
+            reason = str(error)
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "target": asdict(target) if target else None,
+                        "reason": reason,
+                        "devices": [asdict(device) for device in available],
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(format_devices(available, target, reason))
+        if target is None:
+            if args.json:
+                print(reason, file=sys.stderr)
+            return 1
         return 0
     report = diagnose_environment(
         device_name=args.device_name,
