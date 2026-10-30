@@ -21,6 +21,8 @@ class ComposeMessagePage(BasePage):
         '**/XCUIElementTypeNavigationBar[`name == "CKComposeChat"`]/XCUIElementTypeButton[`name == "Cancel"`]',
     )
 
+    HEALTH_LOCATORS = ("NAVIGATION_BAR", "RECIPIENT_FIELD", "BODY_FIELD", "CANCEL_BUTTON")
+
     def wait_until_ready(self) -> None:
         """Require the native compose sheet and its editable fields."""
         self.wait_for_visible(self.NAVIGATION_BAR)

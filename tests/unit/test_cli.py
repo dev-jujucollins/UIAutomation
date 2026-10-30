@@ -8,7 +8,7 @@ import pytest
 from uiautomation import cli
 
 
-@pytest.mark.parametrize("suite", ["unit", "integration", "all", "smoke", "journey"])
+@pytest.mark.parametrize("suite", ["unit", "integration", "all", "smoke", "journey", "locators"])
 def test_direct_and_legacy_commands_have_identical_behavior(monkeypatch, suite):
     runner = MagicMock(return_value=1)
     monkeypatch.setattr(cli, "run_suite", runner)

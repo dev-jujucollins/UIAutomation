@@ -56,7 +56,11 @@ class NewEventPage(BasePage):
         "(type == 'XCUIElementTypeTextField' OR type == 'XCUIElementTypeTextView') AND "
         "(name == 'title-field' OR name == 'magic-compose-field')",
     )
-    LOCATION_FIELD = (BasePage.By.ACCESSIBILITY_ID, "location-video-call-field")
+    # iOS 27.2 names the field by its visible text.
+    LOCATION_FIELD = (
+        BasePage.By.IOS_PREDICATE,
+        "name IN {'location-video-call-field', 'Location or Video Call'}",
+    )
 
     # All-day switch
     ALL_DAY_SWITCH_CELL = (BasePage.By.ACCESSIBILITY_ID, "all-day-switch-cell")
@@ -75,6 +79,15 @@ class NewEventPage(BasePage):
     # Additional options
     REPEAT_CELL = (BasePage.By.ACCESSIBILITY_ID, "repeat-cell")
     CALENDAR_CELL = (BasePage.By.ACCESSIBILITY_ID, "calendar-selection-cell")
+
+    # Date controls are omitted: iOS 27 shows either the collapsed button or the pickers.
+    HEALTH_LOCATORS = (
+        "NEW_TITLE",
+        "TITLE_FIELD",
+        "CANCEL_BUTTON",
+        "ADD_DONE_BUTTON",
+        "LOCATION_FIELD",
+    )
 
     def is_on_new_event_page(self) -> bool:
         """
