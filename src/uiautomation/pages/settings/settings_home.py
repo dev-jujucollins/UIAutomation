@@ -128,6 +128,10 @@ class SettingsHomePage(BasePage):
     )
 
     # Collection view for scrolling (Settings uses a CollectionView, not a Table)
+    # Simulator-safe rows near the top of the list; lower rows (e.g. Privacy) are not in the
+    # accessibility tree until scrolled, and the 27.2 simulator shows "Appearance" instead
+    # of Display & Brightness.
+    HEALTH_LOCATORS = ("SETTINGS_APP", "GENERAL_CELL", "ACCESSIBILITY_CELL", "SEARCH_FIELD")
     SETTINGS_COLLECTION = (BasePage.By.IOS_CLASS_CHAIN, "**/XCUIElementTypeCollectionView[1]")
     SETTINGS_APP = (
         BasePage.By.IOS_PREDICATE,

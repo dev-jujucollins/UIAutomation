@@ -42,6 +42,18 @@ class CalendarHomePage(BasePage):
     INBOX_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "inbox-button")
     TOOLBAR = (BasePage.By.ACCESSIBILITY_ID, "Toolbar")
 
+    HEALTH_LOCATORS = (
+        "DAY_VIEW_NAV_BAR",
+        "TOOLBAR",
+        "TODAY_BUTTON",
+        "ADD_BUTTON",
+        "CALENDARS_BUTTON",
+        "INBOX_BUTTON",
+        "SEARCH_BUTTON",
+        "CURRENT_DAY_LABEL",
+        "TOGGLE_VIEW_BUTTON",
+    )
+
     # Today's date element in the horizontal date picker (has "Today" in name)
     TODAY_DATE_ELEMENT = (
         BasePage.By.IOS_PREDICATE,

@@ -27,6 +27,10 @@ class BasePage:
     # Default timeout for explicit waits
     DEFAULT_TIMEOUT = 10
 
+    # Names of locators that must exist once this page is ready. `uiautomation locators`
+    # checks them all at once, so renamed controls show up before they break tests.
+    HEALTH_LOCATORS: tuple[str, ...] = ()
+
     # Common locator strategies
     class By:
         """Locator strategy shortcuts."""
@@ -466,6 +470,15 @@ class BasePage:
         if timeout is None:
             return self._wait
         return WebDriverWait(self.driver, timeout)
+
+    def missing_health_locators(self) -> list[str]:
+        """Describe each health locator that matches nothing on the current screen."""
+        missing = []
+        for name in self.HEALTH_LOCATORS:
+            by, value = getattr(self, name)
+            if not self.driver.find_elements(by, value):
+                missing.append(f"{type(self).__name__}.{name} ({by}: {value})")
+        return missing
 
     def get_page_source(self) -> str:
         """

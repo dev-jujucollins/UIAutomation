@@ -59,6 +59,7 @@ class MapsPage(BasePage):
         BasePage.By.IOS_PREDICATE,
         "type == 'XCUIElementTypeButton' AND label == 'End Route'",
     )
+    HEALTH_LOCATORS = ("SEARCH", "HOME", "RECENTER")
     MODES = {"drive": "DriveButton", "walk": "WalkButton"}
     NETWORK_TIMEOUT = 45
 

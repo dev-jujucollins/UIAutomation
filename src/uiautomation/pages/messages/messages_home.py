@@ -26,6 +26,8 @@ class MessagesHomePage(BasePage):
         '**/XCUIElementTypeCollectionView[`name == "ConversationList"`]/XCUIElementTypeCell',
     )
 
+    HEALTH_LOCATORS = ("NAVIGATION_BAR", "SEARCH_FIELD", "CONVERSATION_LIST")
+
     def wait_until_ready(self) -> None:
         """Require the home navigation, search field, and conversation list."""
         self.wait_for_visible(self.NAVIGATION_BAR)

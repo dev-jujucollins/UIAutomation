@@ -79,6 +79,31 @@ they do not prove flakiness because code and environment can differ across runs.
 No retries run automatically. Extract multiple CI bundles under one artifact root
 to compare their manifests; keep each run's unique directory name.
 
+### Flaky tests
+
+```bash
+uv run uiautomation history --flaky --runs 20
+```
+
+`--flaky` keeps only tests that both passed and failed on the same target. Each row shows
+its fail rate (skips excluded), its outcomes oldest first (`FFPFPP`), and its flips: how often
+the result changed between pass and fail. Rows rank by flips, so a test that keeps
+alternating appears above a regression that was fixed and stayed fixed (`FFFFPPPP`, one
+flip). `--runs N` keeps only the most recently finished runs.
+
+## Locator health
+
+```bash
+uv run uiautomation locators
+```
+
+Opens Settings, Calendar (home and editor), Messages (home and compose), Contacts, and Maps,
+then reports every locator listed in each page's `HEALTH_LOCATORS` that matches nothing.
+Run it after installing a new iOS runtime: one report names all renamed controls, instead of
+tests failing one at a time. The checks carry the `diagnostic` and `locators` markers, so
+regular suites skip them. List only controls that are always present once the page is
+ready; rows below the fold and state-dependent controls belong in normal tests.
+
 ## Opt-in local email
 
 Run these commands from the repository root:

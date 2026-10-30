@@ -45,6 +45,8 @@ class ContactsPage(BasePage):
     )
     DISCARD_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "Discard Changes")
 
+    HEALTH_LOCATORS = ("SEARCH_FIELD", "ADD_BUTTON")
+
     def __init__(self, driver: WebDriver, launcher: AppLauncher | None = None) -> None:
         """Bind the driver and optional app-lifecycle helper."""
         super().__init__(driver)

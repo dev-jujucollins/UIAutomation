@@ -81,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
         "all": "Run unit and regular integration tests",
         "smoke": "Run quick integration checks",
         "journey": "Run navigation journeys",
+        "locators": "Report page locators that no longer match anything",
     }
     for suite in SUITES:
         direct = commands.add_parser(suite, help=descriptions[suite], allow_abbrev=False)

@@ -19,6 +19,13 @@ SUITES = {
     "integration": ["tests/integration", "--run-integration"],
     "all": ["tests", "--run-integration"],
     "smoke": ["tests/integration", "--run-integration", "-m", "smoke"],
+    "locators": [
+        "tests/integration",
+        "--run-integration",
+        "--run-diagnostics",
+        "-m",
+        "locators",
+    ],
     "journey": [
         "tests/integration",
         "--run-integration",
