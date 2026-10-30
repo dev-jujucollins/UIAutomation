@@ -14,12 +14,14 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
+from uiautomation.drivers.ios_driver import IOSDriverConfig
 from uiautomation.utils.appium_service import get_appium_executable, is_local_appium_url
 from uiautomation.utils.simulator_control import (
     SimulatorDevice,
     get_preferred_simulator,
     list_available_simulators,
 )
+from uiautomation.utils.wda_setup import has_prebuilt_wda
 
 
 @dataclass(frozen=True)
@@ -279,8 +281,38 @@ def diagnose_environment(
     _check_xcode(report, headless)
     _check_simulators(report, device_name, platform_version)
     _check_appium(report, run_driver_doctor)
+    _check_wda_build(report)
     _check_server(report, server_url, require_server)
     return report
+
+
+def _check_wda_build(report: DoctorReport) -> None:
+    """Report whether simulator runs will need to build WebDriverAgent first."""
+    derived_data = Path(IOSDriverConfig().derived_data_path or "").resolve()
+    try:
+        current = has_prebuilt_wda(derived_data)
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
+        report.checks.append(
+            DoctorCheck(
+                "WebDriverAgent build",
+                "warn",
+                f"Cannot read WebDriverAgent sources or Xcode version: {error}",
+                "Install the XCUITest driver: appium driver install xcuitest.",
+            )
+        )
+        return
+    report.checks.append(
+        DoctorCheck(
+            "WebDriverAgent build",
+            "pass" if current else "warn",
+            f"Current build at {derived_data}"
+            if current
+            else "Missing or built by another Xcode/WebDriverAgent version.",
+            None
+            if current
+            else "The next simulator run builds it before tests start (up to 10 minutes).",
+        )
+    )
 
 
 def format_report(report: DoctorReport) -> str:

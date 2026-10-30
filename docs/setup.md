@@ -117,9 +117,13 @@ Per-app cleanup has additional rules:
 reset. Neither disables app fixture cleanup or Maps' per-test permission resets.
 `--restart-simulator` takes effect only when session-level reset is enabled.
 
-Setup subprocesses have bounded timeouts. Pytest defaults to 120 seconds per test;
-examples use 300 seconds to allow setup. A first WebDriverAgent build may require
-`--timeout=600`.
+Setup subprocesses have bounded timeouts. Pytest defaults to 120 seconds per test.
+Simulator runs against a local Appium build WebDriverAgent into
+`artifacts/wda-derived-data` after collection and before the first test, so the build
+(up to 10 minutes on a first run) is not charged to any test's timeout. The build records
+the WebDriverAgent and Xcode versions that produced it and is rebuilt when either changes;
+`uiautomation doctor` reports whether it is current. Physical devices and remote Appium
+servers still build WebDriverAgent during session start and may need `--timeout=600`.
 
 ## Resolve common failures
 
