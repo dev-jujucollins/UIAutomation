@@ -19,6 +19,7 @@ from uiautomation.drivers.ios_driver import IOSDriver, IOSDriverConfig, SystemAp
 from uiautomation.pages.calendar import CalendarHomePage, CalendarOnboardingPage, NewEventPage
 from uiautomation.pages.maps import MapsPage
 from uiautomation.pages.messages import ComposeMessagePage, ConversationPage, MessagesHomePage
+from uiautomation.pages.reminders import NewReminderPage, RemindersHomePage
 from uiautomation.pages.settings import SettingsHomePage, WifiSettingsPage
 from uiautomation.utils.app_launcher import AppLauncher
 from uiautomation.utils.appium_service import is_local_appium_url
@@ -534,6 +535,28 @@ def messages_home(
     home = MessagesHomePage(driver)
     home.wait_until_ready()
     yield home
+
+
+@pytest.fixture
+def reminders_home(
+    request: pytest.FixtureRequest, driver: WebDriver, app_launcher: AppLauncher
+) -> RemindersHomePage:
+    """Relaunch Reminders past first-launch screens to its lists overview."""
+    request.addfinalizer(lambda: app_launcher.terminate(SystemApps.REMINDERS))
+    app_launcher.terminate(SystemApps.REMINDERS)
+    app_launcher.launch(SystemApps.REMINDERS)
+    home = RemindersHomePage(driver)
+    home.wait_until_ready()
+    return home
+
+
+@pytest.fixture
+def reminder_draft(
+    request: pytest.FixtureRequest, reminders_home: RemindersHomePage
+) -> NewReminderPage:
+    """Register the discard before opening a test-owned, unsaved New Reminder sheet."""
+    request.addfinalizer(NewReminderPage(reminders_home.driver).discard)
+    return reminders_home.open_new_reminder()
 
 
 @pytest.fixture

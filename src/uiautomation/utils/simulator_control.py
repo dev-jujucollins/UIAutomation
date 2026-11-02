@@ -24,11 +24,12 @@ DEFAULT_RESET_BUNDLE_IDS: tuple[str, ...] = (
     "com.apple.mobilecal",
 )
 
-# iOS 27 asks Calendar and Maps for contacts through deferred system prompts that can
+# iOS 27 asks Calendar, Maps, and Reminders for contacts through deferred system prompts that can
 # surface over any app mid-run. A recorded denial keeps the prompt from appearing.
 CONTACTS_DENIED_BUNDLE_IDS: tuple[str, ...] = (
     "com.apple.mobilecal",
     "com.apple.Maps",
+    "com.apple.reminders",
 )
 
 

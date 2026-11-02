@@ -41,8 +41,11 @@ def _permission_prompts(app: str) -> dict[str, PromptAnswer]:
 KNOWN_PROMPTS: dict[str, PromptAnswer] = {
     **_permission_prompts("Calendar"),
     **_permission_prompts("Maps"),
+    **_permission_prompts("Reminders"),
     "Allow widgets from “Maps” to use your location?": PromptAnswer(DONT_ALLOW, "Allow"),
     "Getting There Safely": PromptAnswer("OK"),
+    # Reminders' own first-launch alert on a simulator without an Apple Account.
+    "Enable iCloud Syncing?": PromptAnswer("Not Now"),
 }
 
 _STRAIGHT_QUOTES = str.maketrans({"“": '"', "”": '"', "‘": "'", "’": "'"})
