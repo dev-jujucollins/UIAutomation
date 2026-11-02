@@ -123,6 +123,22 @@ tests failing one at a time. The checks carry the `diagnostic` and `locators` ma
 regular suites skip them. List only controls that are always present once the page is
 ready; rows below the fold and state-dependent controls belong in normal tests.
 
+
+## Accessibility labels
+
+```bash
+uv run uiautomation accessibility
+```
+
+Opens the same screens as the locator health check and reports every visible control that
+VoiceOver can focus but cannot name: Buttons, Switches, text and search fields, Sliders,
+and Links that are `accessible` with an empty label. One device-side predicate query does
+this per screen (a full `page_source` snapshot is avoided on iOS 27). Controls nested in a
+labelled, focusable row, such as Calendar's inner all-day toggle, are not accessible
+themselves and are not reported. `test_detector_reports_an_unlabeled_web_button` loads a
+fixture page with an icon-only button to prove the check reports it. The checks carry the
+`diagnostic` and `accessibility` markers, so regular suites skip them.
+
 ## Opt-in local email
 
 Run these commands from the repository root:

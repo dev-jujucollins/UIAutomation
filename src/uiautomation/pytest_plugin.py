@@ -27,6 +27,7 @@ from uiautomation.pages.settings import SettingsHomePage, WifiSettingsPage
 from uiautomation.utils.app_launcher import AppLauncher
 from uiautomation.utils.appium_service import is_local_appium_url
 from uiautomation.utils.failure_artifacts import artifact_links, capture_failure
+from uiautomation.utils.local_site import serve_directory
 from uiautomation.utils.parallel import worker_slot
 from uiautomation.utils.run_reporting import RunReport
 from uiautomation.utils.simulator_control import (
@@ -569,6 +570,17 @@ def messages_home(
     home = MessagesHomePage(driver)
     home.wait_until_ready()
     yield home
+
+
+@pytest.fixture(scope="session")
+def fixture_site(request: pytest.FixtureRequest) -> Generator[str, None, None]:
+    """Serve tests/integration/fixtures/site on 127.0.0.1 for Safari-based tests."""
+    if request.config.getoption("--udid"):
+        pytest.skip("A physical device cannot reach this Mac's localhost")
+    with serve_directory(
+        request.config.rootpath / "tests" / "integration" / "fixtures" / "site"
+    ) as url:
+        yield url
 
 
 @pytest.fixture

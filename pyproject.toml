@@ -61,6 +61,7 @@ markers = [
     "integration: Tests requiring an iOS target",
     "diagnostic: Environment-dependent observations",
     "locators: Health check that key page locators still match",
+    "accessibility: Diagnostic that visible controls have accessibility labels",
     "settings: Tests for the Settings app",
     "contacts: Tests for Contacts app",
     "calendar: Tests for Calendar app",

@@ -23,5 +23,5 @@ Mac's `localhost`, so the local-page tests skip with `--udid`.
 | --- | --- |
 | First launch | Start Page card "Include topics from other devices" (Not Now), then "Safari search now shows personalized suggestions…" (Continue). `SafariPage` taps each only when its text is on screen |
 | Address bar | `TabBarItemTitle` while showing a page, `URL` while editing. Its value is the host with a left-to-right mark (`‎apple.com`), which `host()` strips |
-| Submitting a URL | Typing a trailing return; the keyboard's Go key is missing when the simulator hides the software keyboard |
+| Opening a URL | `open_url` uses `mobile: deepLink`. Typing into the address bar autocompletes from history (typing `http://host/` after visiting `http://host/page.html` loads the latter), which made tests depend on run order |
 | Web content | Exposed by accessible name: headings and text as StaticText, links as Link, `<nav aria-label>` landmarks as Other, inputs as TextField named by `aria-label` |
