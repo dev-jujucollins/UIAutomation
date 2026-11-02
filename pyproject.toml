@@ -68,6 +68,7 @@ markers = [
     "messages: Tests for Messages app drafts and navigation",
     "reminders: Tests for Reminders lists, drafts, and owned reminders",
     "safari: Tests for Safari, against local fixture pages and apple.com",
+    "photos: Tests for the Photos library, viewer, and one imported photo",
     "network: Needs internet access; deselect offline with -m 'not network'",
     "smoke: Smoke tests (quick sanity checks)",
     "regression: Full regression tests",

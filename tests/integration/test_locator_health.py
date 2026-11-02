@@ -11,6 +11,7 @@ from uiautomation.pages.contacts import ContactsPage
 from uiautomation.pages.maps import MapsPage
 from uiautomation.pages.messages.compose_message import ComposeMessagePage
 from uiautomation.pages.messages.messages_home import MessagesHomePage
+from uiautomation.pages.photos import PhotosLibraryPage
 from uiautomation.pages.reminders import RemindersHomePage
 from uiautomation.pages.safari import SafariPage
 from uiautomation.pages.settings import SettingsHomePage
@@ -71,3 +72,8 @@ def test_reminders_overview_locators(reminders_home: RemindersHomePage) -> None:
 @pytest.mark.safari
 def test_safari_locators(safari_home: SafariPage) -> None:
     assert_locators_found(safari_home)
+
+
+@pytest.mark.photos
+def test_photos_library_locators(photos_library: PhotosLibraryPage) -> None:
+    assert_locators_found(photos_library)

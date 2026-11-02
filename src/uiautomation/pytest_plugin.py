@@ -19,6 +19,7 @@ from uiautomation.drivers.ios_driver import IOSDriver, IOSDriverConfig, SystemAp
 from uiautomation.pages.calendar import CalendarHomePage, CalendarOnboardingPage, NewEventPage
 from uiautomation.pages.maps import MapsPage
 from uiautomation.pages.messages import ComposeMessagePage, ConversationPage, MessagesHomePage
+from uiautomation.pages.photos import PhotosLibraryPage
 from uiautomation.pages.reminders import NewReminderPage, RemindersHomePage
 from uiautomation.pages.safari import SafariPage
 from uiautomation.pages.settings import SettingsHomePage, WifiSettingsPage
@@ -549,6 +550,19 @@ def safari_home(
     page = SafariPage(driver)
     page.wait_until_ready()
     return page
+
+
+@pytest.fixture
+def photos_library(
+    request: pytest.FixtureRequest, driver: WebDriver, app_launcher: AppLauncher
+) -> PhotosLibraryPage:
+    """Relaunch Photos past What's New and permission prompts to the Library grid."""
+    request.addfinalizer(lambda: app_launcher.terminate(SystemApps.PHOTOS))
+    app_launcher.terminate(SystemApps.PHOTOS)
+    app_launcher.launch(SystemApps.PHOTOS)
+    library = PhotosLibraryPage(driver)
+    library.wait_until_ready()
+    return library
 
 
 @pytest.fixture

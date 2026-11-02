@@ -36,7 +36,7 @@ class SystemApps(Enum):
     SAFARI = "com.apple.mobilesafari"
     CONTACTS = "com.apple.MobileAddressBook"
     CALENDAR = "com.apple.mobilecal"
-    PHOTOS = "com.apple.Photos"
+    PHOTOS = "com.apple.mobileslideshow"
     MESSAGES = "com.apple.MobileSMS"
     PHONE = "com.apple.mobilephone"
     FACETIME = "com.apple.facetime"
