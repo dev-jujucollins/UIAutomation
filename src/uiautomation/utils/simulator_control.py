@@ -24,12 +24,13 @@ DEFAULT_RESET_BUNDLE_IDS: tuple[str, ...] = (
     "com.apple.mobilecal",
 )
 
-# iOS 27 asks Calendar, Maps, and Reminders for contacts through deferred system prompts that can
+# iOS 27 asks Calendar, Maps, Reminders, and Photos for contacts through deferred system prompts that can
 # surface over any app mid-run. A recorded denial keeps the prompt from appearing.
 CONTACTS_DENIED_BUNDLE_IDS: tuple[str, ...] = (
     "com.apple.mobilecal",
     "com.apple.Maps",
     "com.apple.reminders",
+    "com.apple.mobileslideshow",
 )
 
 
@@ -323,6 +324,17 @@ def reset_simulator_app_state(
             text=True,
             timeout=30,
         )
+
+
+def add_media(udid: str, path: Path) -> None:
+    """Import a photo or video into the simulator's Photos library."""
+    subprocess.run(  # noqa: S603
+        ["xcrun", "simctl", "addmedia", udid, str(path)],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
 
 
 def reset_location_permission(udid: str, bundle_id: str) -> None:

@@ -45,6 +45,8 @@ def test_main_screens_declare_health_locators() -> None:
         "RemindersHomePage",
         "NewReminderPage",
         "SafariPage",
+        "PhotosLibraryPage",
+        "PhotoViewerPage",
     } <= names
 
 
