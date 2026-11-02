@@ -65,6 +65,7 @@ finished with 17 passed and two physical-device-only Calendar skips. No new
 MobileCal or Contacts crash report appeared during that follow-up run. At the time,
 the six smoke cases covered Settings, Calendar, Messages (two), and Maps (two).
 
-On November 2, 2026 (iOS 27.2), the Reminders, Photos, and Files lifecycle tests passed
-on a parallel-run worker simulator. The Calendar and Contacts lifecycle tests have not
-yet been re-run on iOS 27.2.
+On November 2, 2026 (iOS 27.2), all five lifecycle tests passed on a parallel-run worker
+simulator. Contacts first failed there: iOS 27.2 renamed the delete confirmation's
+button from "Delete Contact" to "Delete" (the sheet now carries the "Delete Contact"
+name), and `ContactsPage.DELETE_CONFIRM` now accepts both, still only inside the sheet.

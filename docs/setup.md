@@ -217,8 +217,8 @@ combination or every iOS app flow:
 | Preferred simulator | iPhone 18 Pro, iOS 27.0 |
 
 Re-verified November 2, 2026 with Xcode 27.2, the XCUITest driver 12.22.7, and an
-iPhone 18 Pro on iOS 27.2: smoke, journeys, diagnostics, and the Reminders, Photos,
-and Files lifecycle tests passed. iOS 27.0 simulators are no longer required.
+iPhone 18 Pro on iOS 27.2: smoke, journeys, diagnostics, and all five lifecycle tests
+passed (Maps guidance was not re-run). iOS 27.0 simulators are no longer required.
 
 The selected developer directory was `/Applications/Xcode.app/Contents/Developer`.
 Use the following preflight and smoke run to verify a machine end to end:
