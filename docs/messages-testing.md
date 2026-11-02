@@ -24,20 +24,21 @@ that screen rather than clicking arbitrary Continue/Allow buttons.
 
 ## Run on an isolated simulator
 
-This workspace already has the `UIAutomation Messages` simulator. On another
-Mac with the same device type and runtime installed, create it once:
+Any simulator with the seeded sample conversations works, including the default one;
+the Messages cases passed on an iPhone 18 Pro with iOS 27.2 in November 2026. To keep
+Messages isolated, create a dedicated simulator once:
 
 ```bash
 xcrun simctl create "UIAutomation Messages" \
-  com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro \
-  com.apple.CoreSimulator.SimRuntime.iOS-27-0
+  com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro \
+  com.apple.CoreSimulator.SimRuntime.iOS-27-2
 ```
 
 Run all eight Messages cases:
 
 ```bash
 uv run pytest --run-integration -m messages \
-  --device-name "UIAutomation Messages" --platform-version 27.0 --timeout=300
+  --device-name "UIAutomation Messages"
 ```
 
 For a short smoke run, use `-m "messages and smoke"`. For navigation and discard

@@ -27,7 +27,8 @@ The manifest records:
   test outcome failed even if its assertion phase passed.
 
 For parallel unit tests, the controller manifest (`worker: null`) includes all
-worker results. Worker manifests are also retained. Integration runs remain serial.
+worker results. Worker manifests are also retained. Parallel simulator runs work the
+same way, with each worker recording its own simulator as its target.
 Manifest writes are best effort: a filesystem error is logged without changing
 the test result. A hard-killed process may leave an incomplete manifest without
 end time or summary; completed phase records remain available.
@@ -38,9 +39,9 @@ end time or summary; completed phase records remain available.
 uv run pytest tests/unit --html=reports/unit.html --self-contained-html \
   --junitxml=reports/unit.xml
 
-uv run pytest --run-integration -m smoke -n 0 --platform-version 27.0 \
+uv run pytest --run-integration -m smoke \
   --html=reports/simulator.html --self-contained-html \
-  --junitxml=reports/simulator.xml --timeout=600
+  --junitxml=reports/simulator.xml
 ```
 
 On failure, each HTML result shows the screenshot inline and links to the available
@@ -151,7 +152,7 @@ uv run uiautomation unit
 uv run uiautomation unit --email-preview
 
 # After configuring a sender: one summary per explicitly requested run
-uv run uiautomation smoke --email --platform-version 27.0 --timeout=300
+uv run uiautomation smoke --email
 ```
 
 Suites are `unit`, `integration`, `all`, `smoke`, and `journey`. `integration`
@@ -162,8 +163,8 @@ also require an explicitly named simulator. The journey preset excludes saved-da
 and Maps navigation cases. For example:
 
 ```bash
-uv run uiautomation integration --email --platform-version 27.0 --timeout=300
-uv run uiautomation all --email --platform-version 27.0 --timeout=300
+uv run uiautomation integration --email
+uv run uiautomation all --email
 ```
 
 Common device, timeout, marker/name selection, reset, and opt-in options work
