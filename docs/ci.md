@@ -27,6 +27,10 @@ claim that the GitHub workflows have completed.
 
 ## Dedicated simulator runner
 
+No self-hosted runner is registered and `ENABLE_SIMULATOR_CI` is unset, so both Mac
+workflows are currently skipped and device suites run locally. The rest of this section
+describes how to enable them on a dedicated, always-on Mac.
+
 `.github/workflows/simulator-smoke.yml` supports manual dispatch and a nightly
 schedule at 10:17 UTC. Nightly execution is disabled until the repository variable
 `ENABLE_SIMULATOR_CI` is set to `true`; manual dispatch does not require that flag.
@@ -62,7 +66,7 @@ Configure the runner before enabling the schedule:
    `ENABLE_SIMULATOR_CI=true`.
 
 The workflow installs Python 3.12 and locked Python packages, runs the read-only
-doctor check, then runs the existing six smoke cases serially on the exact
+doctor check, then runs the smoke cases serially on the exact
 simulator/runtime. It allows ten minutes per test for an initial WDA build and
 thirty minutes for the job. One concurrency group queues runs instead of
 interrupting a device session. No simulator is erased, no messages are sent,

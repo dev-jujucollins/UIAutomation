@@ -18,7 +18,8 @@ appium driver install xcuitest
 
 Install simulator runtimes in Xcode Settings and create simulators in Device Hub or
 with `simctl`. The framework boots existing simulators; it does not create them or
-download Xcode, runtimes, Appium, or drivers. Any iPhone simulator on iOS 27.0 works;
+download Xcode, runtimes, Appium, or drivers. Any iPhone simulator on iOS 27 works (flows
+were last verified on iOS 27.2);
 the [Maps](maps-testing.md), [Messages](messages-testing.md), and
 [lifecycle](lifecycle-testing.md) guides describe optional dedicated simulators.
 
@@ -93,7 +94,7 @@ simulator.
 
 ```bash
 uv run uiautomation doctor
-uv run uiautomation doctor --device-name "iPhone 18 Pro" --platform-version 27.0
+uv run uiautomation doctor --device-name "iPhone 18 Pro"
 uv run uiautomation doctor --headless-simulator --json
 ```
 
@@ -141,8 +142,8 @@ recommendations do not necessarily prevent this project's simulator tests.
 
 ## What a device run changes
 
-One Appium driver session is reused per pytest run. Integration tests run serially;
-parallel device execution is rejected. App fixtures establish each test's starting
+One Appium driver session is reused per pytest run (per worker with `-n`; see
+[parallel runs](#run-simulator-tests-in-parallel)). App fixtures establish each test's starting
 state and register termination cleanup before launching the app.
 
 For simulator runs, the framework:
@@ -215,13 +216,16 @@ combination or every iOS app flow:
 | XCUITest driver | 10.43.1 |
 | Preferred simulator | iPhone 18 Pro, iOS 27.0 |
 
+Re-verified November 2, 2026 with Xcode 27.2, the XCUITest driver 12.22.7, and an
+iPhone 18 Pro on iOS 27.2: smoke, journeys, diagnostics, and the Reminders, Photos,
+and Files lifecycle tests passed. iOS 27.0 simulators are no longer required.
+
 The selected developer directory was `/Applications/Xcode.app/Contents/Developer`.
 Use the following preflight and smoke run to verify a machine end to end:
 
 ```bash
-uv run uiautomation doctor --platform-version 27.0 --headless-simulator
-uv run pytest --run-integration -m smoke --platform-version 27.0 \
-  --headless-simulator --timeout=300
+uv run uiautomation doctor --headless-simulator
+uv run pytest --run-integration -m smoke --headless-simulator
 ```
 
 Create/delete lifecycle journeys use an explicitly isolated simulator; see

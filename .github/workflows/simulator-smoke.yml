@@ -35,7 +35,7 @@ jobs:
           uv run --no-editable uiautomation doctor
           --device-name "$UIAUTOMATION_SIMULATOR" --platform-version "$UIAUTOMATION_RUNTIME"
           --headless-simulator
-      - name: Run six simulator smoke cases serially
+      - name: Run simulator smoke cases serially
         run: >-
           uv run --no-editable pytest tests/integration --run-integration
           -m smoke -n 0 --headless-simulator

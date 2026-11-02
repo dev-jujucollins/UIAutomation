@@ -2,7 +2,7 @@
 
 ## Target and scope
 
-Use an iPhone simulator with iOS 27.0, English UI, and internet access. Any
+Use an iPhone simulator with iOS 27, English UI, and internet access. Any
 simulator name works, including automatic target selection. The fixture skips
 physical devices before creating a driver session. Existing Appium setup opens
 Device Hub for visible runs. An isolated simulator is optional.
@@ -10,16 +10,16 @@ Device Hub for visible runs. An isolated simulator is optional.
 ```bash
 # Optional: create an isolated simulator once
 xcrun simctl create "UIAutomation Maps" \
-  com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro \
-  com.apple.CoreSimulator.SimRuntime.iOS-27-0
+  com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro \
+  com.apple.CoreSimulator.SimRuntime.iOS-27-2
 
-uv run pytest --run-integration -m maps \
-  --platform-version 27.0 --timeout=300
+uv run pytest --run-integration -m maps
 ```
 
-The run command selects an available iOS 27.0 simulator. Add `--device-name`
-with any existing simulator name to choose one explicitly. First WebDriverAgent
-build may take several minutes.
+The run command uses the default simulator (see `uiautomation devices`). Add
+`--device-name` with any existing simulator name to choose one explicitly. The
+non-navigation cases passed on iOS 27.2 in November 2026; the guidance case below
+was last verified on iOS 27.0.
 
 ## P0 acceptance cases
 
@@ -60,7 +60,7 @@ a maneuver and the expected destination in its navigation tray.
 
 ```bash
 uv run pytest --run-integration --run-maps-navigation -m maps_navigation \
-  --device-name "UIAutomation Maps" --platform-version 27.0 --timeout=600
+  --device-name "UIAutomation Maps" --timeout=600
 ```
 
 Use any existing simulator name in place of `UIAutomation Maps`. The navigation
