@@ -8,6 +8,7 @@ from appium.webdriver.webdriver import WebDriver
 from appium.webdriver.webelement import WebElement
 from selenium.common.exceptions import StaleElementReferenceException
 
+from uiautomation.drivers.ios_driver import SystemApps
 from uiautomation.utils.locators import predicate_literal
 
 from ..base_page import BasePage
@@ -87,11 +88,14 @@ class SafariPage(BasePage):
         self._get_wait(self.LAUNCH_TIMEOUT).until(ready, "Safari address bar not ready")
 
     def open_url(self, url: str, loaded: tuple[str, str]) -> None:
-        """Type a URL into the address bar and wait for an element of the loaded page."""
-        if not self._visible(self.ADDRESS_FIELD):
-            self.click(self.ADDRESS_BAR)
-        # Return submits; the on-screen Go key is absent when the simulator hides the keyboard.
-        self.send_keys(self.ADDRESS_FIELD, url + "\n", clear_first=True)
+        """Open a URL in Safari and wait for an element of the loaded page.
+
+        A deep link, not typing: the address bar autocompletes from history, so typing
+        ``http://host/`` after visiting ``http://host/page.html`` would load the latter.
+        """
+        self.driver.execute_script(
+            "mobile: deepLink", {"url": url, "bundleId": SystemApps.SAFARI.value}
+        )
         self.wait_for_visible(loaded, timeout=self.PAGE_LOAD_TIMEOUT)
 
     def host(self) -> str:

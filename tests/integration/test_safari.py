@@ -1,16 +1,11 @@
 """Safari on pages served from this Mac (deterministic) and on apple.com (real world)."""
 
-from collections.abc import Iterator
-from pathlib import Path
-
 import pytest
 
 from uiautomation.pages.safari import SafariPage
-from uiautomation.utils.local_site import serve_directory
 
 pytestmark = pytest.mark.safari
 
-SITE = Path(__file__).parent / "fixtures" / "site"
 HOME_HEADING = SafariPage.text("UIAutomation fixture page")
 SECOND_HEADING = SafariPage.text("Second fixture page")
 
@@ -18,15 +13,6 @@ SECOND_HEADING = SafariPage.text("Second fixture page")
 APPLE_URL = "https://www.apple.com"
 APPLE_GLOBAL_NAV = SafariPage.web("Other", "Global, navigation")
 APPLE_IPHONE_NAV = SafariPage.web("Other", "iPhone family, navigation")
-
-
-@pytest.fixture(scope="module")
-def fixture_site(request: pytest.FixtureRequest) -> Iterator[str]:
-    """Local pages keep these Safari checks independent of the internet."""
-    if request.config.getoption("--udid"):
-        pytest.skip("A physical device cannot reach this Mac's localhost")
-    with serve_directory(SITE) as url:
-        yield url
 
 
 @pytest.mark.smoke

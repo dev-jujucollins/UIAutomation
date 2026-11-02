@@ -161,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
         "smoke": "Run quick integration checks",
         "journey": "Run navigation journeys",
         "locators": "Report page locators that no longer match anything",
+        "accessibility": "Report visible controls without accessibility labels",
     }
     for suite in SUITES:
         direct = commands.add_parser(suite, help=descriptions[suite], allow_abbrev=False)

@@ -26,6 +26,13 @@ SUITES = {
         "-m",
         "locators",
     ],
+    "accessibility": [
+        "tests/integration",
+        "--run-integration",
+        "--run-diagnostics",
+        "-m",
+        "accessibility",
+    ],
     "journey": [
         "tests/integration",
         "--run-integration",

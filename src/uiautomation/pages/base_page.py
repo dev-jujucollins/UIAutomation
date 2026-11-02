@@ -27,6 +27,17 @@ class BasePage:
     # Default timeout for explicit waits
     DEFAULT_TIMEOUT = 10
 
+    # Controls a VoiceOver user must be able to identify; containers like cells are excluded.
+    LABELLED_CONTROL_TYPES = (
+        "Button",
+        "Switch",
+        "TextField",
+        "SecureTextField",
+        "SearchField",
+        "Slider",
+        "Link",
+    )
+
     # Names of locators that must exist once this page is ready. `uiautomation locators`
     # checks them all at once, so renamed controls show up before they break tests.
     HEALTH_LOCATORS: tuple[str, ...] = ()
@@ -479,6 +490,30 @@ class BasePage:
             if not self.driver.find_elements(by, value):
                 missing.append(f"{type(self).__name__}.{name} ({by}: {value})")
         return missing
+
+    def unlabeled_controls(self) -> list[str]:
+        """Describe visible, focusable controls with no label, which VoiceOver can't name.
+
+        One device-side query; a full page_source snapshot is avoided because it can disturb
+        later visibility results on iOS 27.
+        """
+        types = ", ".join(f"'XCUIElementType{kind}'" for kind in self.LABELLED_CONTROL_TYPES)
+        # accessible == 1: VoiceOver focuses it. Nested toggles inside a labelled row (such
+        # as Calendar's all-day switch) are not accessible themselves, so they don't count.
+        query = (
+            f"type IN {{{types}}} AND visible == 1 AND accessible == 1 "
+            "AND (label == nil OR label == '')"
+        )
+        found = []
+        for element in self.driver.find_elements(self.By.IOS_PREDICATE, query):
+            try:
+                kind = str(element.get_attribute("type") or "").removeprefix("XCUIElementType")
+                name = element.get_attribute("name")
+                rect = element.rect
+            except StaleElementReferenceException:
+                continue
+            found.append(f"{kind} name={name!r} at ({rect['x']}, {rect['y']})")
+        return found
 
     def get_page_source(self) -> str:
         """
