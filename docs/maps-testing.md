@@ -18,8 +18,7 @@ uv run pytest --run-integration -m maps
 
 The run command uses the default simulator (see `uiautomation devices`). Add
 `--device-name` with any existing simulator name to choose one explicitly. The
-non-navigation cases passed on iOS 27.2 in November 2026; the guidance case below
-was last verified on iOS 27.0.
+cases, including the guidance case below, passed on iOS 27.2 in November 2026.
 
 ## P0 acceptance cases
 
