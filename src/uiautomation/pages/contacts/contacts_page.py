@@ -33,9 +33,11 @@ class ContactsPage(BasePage):
         "type == 'XCUIElementTypeCell' AND name == 'Delete Contact'",
     )
     DELETE_SHEET = (BasePage.By.IOS_PREDICATE, "type == 'XCUIElementTypeSheet' AND visible == 1")
+    # Searched only inside the confirmation sheet. iOS 27.2 renamed the button to "Delete"
+    # and gave the sheet itself the "Delete Contact" name.
     DELETE_CONFIRM = (
         BasePage.By.IOS_PREDICATE,
-        "type == 'XCUIElementTypeButton' AND name == 'Delete Contact'",
+        "type == 'XCUIElementTypeButton' AND name IN {'Delete Contact', 'Delete'}",
     )
     DISCARD_SHEET = (
         BasePage.By.IOS_PREDICATE,
