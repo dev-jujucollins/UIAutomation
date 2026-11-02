@@ -71,15 +71,15 @@ def test_readiness_accepts_device_and_simulator_anchors(names: tuple[str, str]) 
     [
         ("", "root"),
         (settings_xml(row("wifi") + row("bluetooth"), app_name="SpringBoard"), "root"),
-        (settings_xml(row("wifi") + row("wifi")), "two expected"),
-        (settings_xml(row("wifi") + row("bluetooth", "false")), "two expected"),
+        (settings_xml(row("siri") + row("camera")), "no expected"),
+        (settings_xml(row("wifi", "false")), "no expected"),
         (
             settings_xml(row("wifi") + row("bluetooth"), '<XCUIElementTypeAlert visible="true"/>'),
             "alert",
         ),
         ('<XCUIElementTypeApplication name="Settings" visible="true"/>', "list"),
     ],
-    ids=["empty", "springboard", "duplicate-row", "hidden-row", "alert", "missing-list"],
+    ids=["empty", "springboard", "no-anchor-row", "hidden-row", "alert", "missing-list"],
 )
 def test_readiness_rejects_unusable_home(source: str, message: str) -> None:
     driver = driver_from_xml(source)
@@ -104,10 +104,16 @@ def test_readiness_waits_for_elements_to_become_ready() -> None:
 
 
 def test_readiness_timeout_reports_latest_failure() -> None:
-    page = SettingsHomePage(driver_from_xml(settings_xml(row("wifi"))))
+    page = SettingsHomePage(driver_from_xml(settings_xml(row("siri"))))
     page.DEFAULT_TIMEOUT = 0
-    with pytest.raises(AssertionError, match="fewer than two"):
+    with pytest.raises(AssertionError, match="no expected initial Settings row"):
         page.assert_home_visually_ready()
+
+
+def test_largest_text_size_shows_only_the_apple_account_row() -> None:
+    """At accessibility text sizes the first row alone fills the screen."""
+    page = SettingsHomePage(driver_from_xml(settings_xml(row("primaryAppleAccount"))))
+    assert page.is_home_visually_ready()
 
 
 def test_readiness_retries_a_stale_hierarchy() -> None:

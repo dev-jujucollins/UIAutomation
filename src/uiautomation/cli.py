@@ -32,6 +32,8 @@ _VALUE_OPTIONS = {
     "--udid": "Physical device identifier",
     "--team-id": "Signing team for physical-device WebDriverAgent",
     "--timeout": "Per-test timeout in seconds (pytest default: 120)",
+    "--appearance": "Simulator appearance for the run: light or dark (restored afterwards)",
+    "--content-size": "Dynamic Type size, e.g. accessibility-extra-extra-extra-large",
 }
 _FLAG_OPTIONS = {
     "--headless-simulator": "Skip opening Device Hub",

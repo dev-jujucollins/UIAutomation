@@ -133,7 +133,7 @@ class RunReport:
         self.manifest["environment"] = collect_environment(self.repository, self.integration)
         self.manifest["worker"] = getattr(session.config, "workerinput", {}).get("workerid")
         options = session.config.option
-        self.manifest["options"] = {
+        recorded: dict[str, Any] = {
             name: value
             for name in (
                 "run_integration",
@@ -149,6 +149,12 @@ class RunReport:
             )
             if isinstance((value := getattr(options, name, None)), (bool, int, float))
         }
+        # Display settings change what every screen looks like, so reruns must repeat them.
+        for name in ("appearance", "content_size"):
+            value = getattr(options, name, None)
+            if isinstance(value, str):
+                recorded[name] = value
+        self.manifest["options"] = recorded
         self.write()
 
     def pytest_collection_finish(self, session: Any) -> None:

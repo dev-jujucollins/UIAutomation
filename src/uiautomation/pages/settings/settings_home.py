@@ -137,7 +137,10 @@ class SettingsHomePage(BasePage):
         BasePage.By.IOS_PREDICATE,
         "type == 'XCUIElementTypeApplication' AND (name == 'Settings' OR label == 'Settings')",
     )
+    # Rows at the top of Settings. At the largest Dynamic Type sizes the Apple Account row
+    # alone fills the screen, so one visible anchor is enough.
     INITIAL_SCREEN_ANCHOR_NAMES = {
+        "com.apple.settings.primaryAppleAccount",
         "com.apple.settings.airplaneMode",
         "com.apple.settings.wifi",
         "com.apple.settings.bluetooth",
@@ -200,8 +203,8 @@ class SettingsHomePage(BasePage):
             }
         except StaleElementReferenceException:
             return ["Settings hierarchy changed during readiness check"]
-        if len(anchors) < 2:
-            return ["fewer than two expected initial Settings rows are visible"]
+        if not anchors:
+            return ["no expected initial Settings row is visible"]
         return []
 
     def is_home_visually_ready(self) -> bool:

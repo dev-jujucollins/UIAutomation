@@ -30,13 +30,17 @@ from uiautomation.utils.failure_artifacts import artifact_links, capture_failure
 from uiautomation.utils.parallel import worker_slot
 from uiautomation.utils.run_reporting import RunReport
 from uiautomation.utils.simulator_control import (
+    APPEARANCES,
+    CONTENT_SIZES,
     boot_worker_simulator,
     clear_simulator_location,
     ensure_worker_simulator,
     get_preferred_simulator,
+    get_ui_setting,
     reset_location_permission,
     reset_simulator_app_state,
     set_simulator_location,
+    set_ui_setting,
     stop_stray_wda,
 )
 from uiautomation.utils.wda_setup import (
@@ -63,6 +67,8 @@ CALENDAR_LAUNCH_TIMEOUT = 30
 # WebDriverAgent launch takes over a minute, more when several start at once.
 SESSION_START_BUDGET_SECONDS = 300
 APPLE_PARK_COORDINATES = (37.3349, -122.00902)
+# simctl ui settings a run may change, with the option that selects each.
+DISPLAY_SETTINGS = {"appearance": "--appearance", "content_size": "--content-size"}
 # Opt-in suites that own data or guidance on one explicitly named simulator.
 SERIAL_ONLY_FLAGS = ("--run-lifecycle", "--run-maps-navigation")
 # Larger screenshots stay as links so emailed HTML reports fit the 10 MB attachment limit.
@@ -94,6 +100,16 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         "--headless-simulator", action="store_true", help="Boot without opening Device Hub"
+    )
+    parser.addoption(
+        "--appearance",
+        choices=APPEARANCES,
+        help="Run with this simulator appearance; the original is restored afterwards",
+    )
+    parser.addoption(
+        "--content-size",
+        choices=CONTENT_SIZES,
+        help="Run with this Dynamic Type size; the original is restored afterwards",
     )
     parser.addoption(
         "--artifacts-dir", default="artifacts", help="Root directory for run artifacts"
@@ -145,6 +161,8 @@ def pytest_addoption(parser):
 
 def pytest_configure(config: pytest.Config) -> None:
     """Assign a unique artifact location without touching the device."""
+    if config.getoption("--udid") and any(map(config.getoption, DISPLAY_SETTINGS.values())):
+        raise pytest.UsageError("--appearance and --content-size need a simulator, not --udid")
     if config.getoption("--run-integration") and config.getoption("numprocesses", default=0):
         if config.getoption("--udid"):
             raise pytest.UsageError("Physical devices run serially: use -n 0 with --udid.")
@@ -409,10 +427,23 @@ def ios_driver(
     # Only the first test to request the session gets the start-up budget.
     request.config.stash[SESSION_STARTING] = True
     driver = IOSDriver(config=driver_config)
+    originals: dict[str, str] = {}
     try:
         driver.start()
+        if driver_config.udid and not request.config.getoption("--udid"):
+            for setting, option in DISPLAY_SETTINGS.items():
+                value = request.config.getoption(option)
+                if value is not None:
+                    originals[setting] = get_ui_setting(driver_config.udid, setting)
+                    set_ui_setting(driver_config.udid, setting, value)
         yield driver
     finally:
+        # Put the simulator's own display settings back, even after a failed run.
+        for setting, value in originals.items():
+            try:
+                set_ui_setting(str(driver_config.udid), setting, value)
+            except (OSError, subprocess.SubprocessError):
+                logging.getLogger(__name__).exception("Unable to restore %s", setting)
         driver.quit()
         # Workers stay booted like the main simulator: a rebooted worker's next session
         # takes ~90 s instead of ~30 s. Appium leaves WDA's xcodebuild running, which
