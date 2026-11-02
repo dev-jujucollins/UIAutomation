@@ -34,6 +34,25 @@ Without options the default is iPhone 18 Pro on its pinned runtime, or on the ne
 one. Pass the same `--device-name` / `--platform-version` to any suite command to change the
 target; `devices` resolves them exactly as a run does and exits 1 when nothing matches.
 
+## Run in dark mode or at a large text size
+
+```bash
+uv run uiautomation smoke --appearance dark
+uv run uiautomation smoke --content-size accessibility-extra-extra-extra-large
+uv run uiautomation smoke --appearance dark --content-size extra-extra-extra-large
+```
+
+`--appearance` (`light`, `dark`) and `--content-size` (the 12 Dynamic Type categories,
+`extra-small` … `accessibility-extra-extra-extra-large`) change the simulator with
+`simctl ui` once the session starts, and restore the original values when it ends, even if
+the run fails. They are recorded in `run.json`, so `uiautomation rerun` repeats them, and
+work with `-n` (each worker sets and restores its own simulator). Physical devices are
+rejected: `simctl` cannot change them.
+
+Large text moves content below the fold, where it is absent from the accessibility tree.
+Page objects that read lower rows scroll to them first (for example
+`RemindersHomePage` swipes its lists table to reach My Lists).
+
 ## Run simulator tests in parallel
 
 ```bash

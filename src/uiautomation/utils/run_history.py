@@ -185,7 +185,11 @@ def rerun_options(run: dict[str, Any], skip: AbstractSet[str] = frozenset()) -> 
         for name in _RERUN_FLAGS
         if recorded.get(name) is True and (flag := f"--{name.replace('_', '-')}") not in skip
     ]
-    values: list[tuple[str, Any]] = [("--timeout", recorded.get("timeout"))]
+    values: list[tuple[str, Any]] = [
+        ("--timeout", recorded.get("timeout")),
+        ("--appearance", recorded.get("appearance")),
+        ("--content-size", recorded.get("content_size")),
+    ]
     target = run.get("target") or {}
     if target.get("kind") == "simulator":
         values += [

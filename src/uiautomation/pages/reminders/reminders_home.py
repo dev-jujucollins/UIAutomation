@@ -29,6 +29,7 @@ class RemindersHomePage(BasePage):
     LISTS_NAV = (BasePage.By.ACCESSIBILITY_ID, "Reminders.TTRIAccountsListsView")
     NEW_REMINDER = (BasePage.By.ACCESSIBILITY_ID, "New Reminder")
     ADD_LIST = (BasePage.By.ACCESSIBILITY_ID, "Add List")
+    LISTS_TABLE = (BasePage.By.ACCESSIBILITY_ID, "AccountsList.ID.AccountsListTable")
     COMPLETED = (BasePage.By.ACCESSIBILITY_ID, "Completed")
     BACK_BUTTON = (BasePage.By.ACCESSIBILITY_ID, "BackButton")
     # First-launch "Welcome to Reminders" screen.
@@ -85,9 +86,28 @@ class RemindersHomePage(BasePage):
             f"type == 'XCUIElementTypeCell' AND label BEGINSWITH {predicate_literal(name + ', ')}",
         )
 
+    def _scroll_to_list(self, name: str, max_swipes: int = 5) -> WebElement:
+        """My Lists sits below the smart lists; at large text sizes it starts off screen.
+
+        Off-screen cells are not in the accessibility tree, and a whole-app scroll does not
+        move this list, so swipe the list itself until the cell appears.
+        """
+        for attempt in range(max_swipes + 1):
+            # Presence, not is_displayed: cells off screen are absent from the tree, and a
+            # cell can briefly report hidden while a sheet closes over it.
+            cells = self.driver.find_elements(*self.list_cell(name))
+            if cells:
+                return cells[0]
+            if attempt == max_swipes:
+                break
+            table = self.find_element(self.LISTS_TABLE)
+            self.driver.execute_script("mobile: swipe", {"elementId": table.id, "direction": "up"})
+        raise AssertionError(f"Reminders list {name!r} not found after {max_swipes} swipes")
+
     def list_count(self, name: str = DEFAULT_LIST) -> int:
         """Number of incomplete reminders the overview reports for a list."""
-        label = self.find_element(self.list_cell(name)).get_attribute("label") or ""
+        cell = self._scroll_to_list(name)
+        label = cell.get_attribute("label") or ""
         match = re.fullmatch(rf"{re.escape(name)}, (\d+) reminders?", str(label))
         if match is None:
             raise AssertionError(f"Unexpected list label: {label!r}")
@@ -106,7 +126,7 @@ class RemindersHomePage(BasePage):
         """Open a list under My Lists."""
         from .reminder_list import ReminderListPage
 
-        self.click(self.list_cell(name))
+        self._scroll_to_list(name).click()
         page = ReminderListPage(self.driver, name)
         page.wait_until_ready()
         return page

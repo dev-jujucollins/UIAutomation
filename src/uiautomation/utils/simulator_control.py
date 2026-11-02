@@ -326,6 +326,45 @@ def reset_simulator_app_state(
         )
 
 
+APPEARANCES: tuple[str, ...] = ("light", "dark")
+CONTENT_SIZES: tuple[str, ...] = (
+    "extra-small",
+    "small",
+    "medium",
+    "large",
+    "extra-large",
+    "extra-extra-large",
+    "extra-extra-extra-large",
+    "accessibility-medium",
+    "accessibility-large",
+    "accessibility-extra-large",
+    "accessibility-extra-extra-large",
+    "accessibility-extra-extra-extra-large",
+)
+
+
+def get_ui_setting(udid: str, setting: str) -> str:
+    """Read a ``simctl ui`` setting such as ``appearance`` or ``content_size``."""
+    return subprocess.run(  # noqa: S603
+        ["xcrun", "simctl", "ui", udid, setting],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    ).stdout.strip()
+
+
+def set_ui_setting(udid: str, setting: str, value: str) -> None:
+    """Change a ``simctl ui`` setting; apps pick it up when they next draw."""
+    subprocess.run(  # noqa: S603
+        ["xcrun", "simctl", "ui", udid, setting, value],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+
 def add_media(udid: str, path: Path) -> None:
     """Import a photo or video into the simulator's Photos library."""
     subprocess.run(  # noqa: S603

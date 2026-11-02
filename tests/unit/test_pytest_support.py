@@ -453,3 +453,17 @@ def test_parallel_device_runs_use_workstealing(harness) -> None:
     assert "DIST=worksteal" in output
     unit_only = harness.runpytest_subprocess("-n", "2", "-s").stdout.str()
     assert "DIST=load" in unit_only
+
+
+def test_display_settings_reject_physical_devices(harness) -> None:
+    harness.makepyfile("def test_unit(): pass")
+    result = harness.runpytest_subprocess("--udid", "phone", "--appearance", "dark")
+    assert result.ret != 0
+    assert "need a simulator" in result.stdout.str() + result.stderr.str()
+
+
+def test_manifest_records_display_settings(harness) -> None:
+    harness.makepyfile("def test_unit(): pass")
+    harness.runpytest_subprocess("--appearance", "dark", "-q").assert_outcomes(passed=1)
+    (manifest,) = harness.path.glob("artifacts/*/run.json")
+    assert json.loads(manifest.read_text())["options"]["appearance"] == "dark"
