@@ -11,6 +11,8 @@ from uiautomation.pages.contacts import ContactsPage
 from uiautomation.pages.maps import MapsPage
 from uiautomation.pages.messages.compose_message import ComposeMessagePage
 from uiautomation.pages.messages.messages_home import MessagesHomePage
+from uiautomation.pages.reminders import RemindersHomePage
+from uiautomation.pages.safari import SafariPage
 from uiautomation.pages.settings import SettingsHomePage
 
 pytestmark = [pytest.mark.diagnostic, pytest.mark.locators]
@@ -59,3 +61,13 @@ def test_contacts_list_locators(request: pytest.FixtureRequest, driver: WebDrive
 @pytest.mark.maps
 def test_maps_home_locators(maps_home: MapsPage) -> None:
     assert_locators_found(maps_home)
+
+
+@pytest.mark.reminders
+def test_reminders_overview_locators(reminders_home: RemindersHomePage) -> None:
+    assert_locators_found(reminders_home)
+
+
+@pytest.mark.safari
+def test_safari_locators(safari_home: SafariPage) -> None:
+    assert_locators_found(safari_home)

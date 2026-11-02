@@ -20,6 +20,7 @@ from uiautomation.pages.calendar import CalendarHomePage, CalendarOnboardingPage
 from uiautomation.pages.maps import MapsPage
 from uiautomation.pages.messages import ComposeMessagePage, ConversationPage, MessagesHomePage
 from uiautomation.pages.reminders import NewReminderPage, RemindersHomePage
+from uiautomation.pages.safari import SafariPage
 from uiautomation.pages.settings import SettingsHomePage, WifiSettingsPage
 from uiautomation.utils.app_launcher import AppLauncher
 from uiautomation.utils.appium_service import is_local_appium_url
@@ -535,6 +536,19 @@ def messages_home(
     home = MessagesHomePage(driver)
     home.wait_until_ready()
     yield home
+
+
+@pytest.fixture
+def safari_home(
+    request: pytest.FixtureRequest, driver: WebDriver, app_launcher: AppLauncher
+) -> SafariPage:
+    """Relaunch Safari past its first-launch notices to a usable address bar."""
+    request.addfinalizer(lambda: app_launcher.terminate(SystemApps.SAFARI))
+    app_launcher.terminate(SystemApps.SAFARI)
+    app_launcher.launch(SystemApps.SAFARI)
+    page = SafariPage(driver)
+    page.wait_until_ready()
+    return page
 
 
 @pytest.fixture

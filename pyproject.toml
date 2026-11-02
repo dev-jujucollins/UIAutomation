@@ -67,6 +67,8 @@ markers = [
     "maps: Tests for Maps search and route previews",
     "messages: Tests for Messages app drafts and navigation",
     "reminders: Tests for Reminders lists, drafts, and owned reminders",
+    "safari: Tests for Safari, against local fixture pages and apple.com",
+    "network: Needs internet access; deselect offline with -m 'not network'",
     "smoke: Smoke tests (quick sanity checks)",
     "regression: Full regression tests",
     "slow: Tests that take a long time to run",
