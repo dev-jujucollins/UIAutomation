@@ -8,6 +8,7 @@ from uiautomation.pages.base_page import BasePage
 from uiautomation.pages.calendar.calendar_home import CalendarHomePage
 from uiautomation.pages.calendar.new_event import NewEventPage
 from uiautomation.pages.contacts import ContactsPage
+from uiautomation.pages.files import FilesPage
 from uiautomation.pages.maps import MapsPage
 from uiautomation.pages.messages.compose_message import ComposeMessagePage
 from uiautomation.pages.messages.messages_home import MessagesHomePage
@@ -77,3 +78,8 @@ def test_safari_locators(safari_home: SafariPage) -> None:
 @pytest.mark.photos
 def test_photos_library_locators(photos_library: PhotosLibraryPage) -> None:
     assert_locators_found(photos_library)
+
+
+@pytest.mark.files
+def test_files_browser_locators(files_home: FilesPage) -> None:
+    assert_locators_found(files_home)
