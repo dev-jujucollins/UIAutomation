@@ -47,6 +47,7 @@ def test_main_screens_declare_health_locators() -> None:
         "SafariPage",
         "PhotosLibraryPage",
         "PhotoViewerPage",
+        "FilesPage",
     } <= names
 
 

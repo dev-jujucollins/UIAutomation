@@ -17,6 +17,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from uiautomation.drivers.ios_driver import IOSDriver, IOSDriverConfig, SystemApps
 from uiautomation.pages.calendar import CalendarHomePage, CalendarOnboardingPage, NewEventPage
+from uiautomation.pages.files import FilesPage
 from uiautomation.pages.maps import MapsPage
 from uiautomation.pages.messages import ComposeMessagePage, ConversationPage, MessagesHomePage
 from uiautomation.pages.photos import PhotosLibraryPage
@@ -548,6 +549,19 @@ def safari_home(
     app_launcher.terminate(SystemApps.SAFARI)
     app_launcher.launch(SystemApps.SAFARI)
     page = SafariPage(driver)
+    page.wait_until_ready()
+    return page
+
+
+@pytest.fixture
+def files_home(
+    request: pytest.FixtureRequest, driver: WebDriver, app_launcher: AppLauncher
+) -> FilesPage:
+    """Relaunch Files to its document browser."""
+    request.addfinalizer(lambda: app_launcher.terminate(SystemApps.FILES))
+    app_launcher.terminate(SystemApps.FILES)
+    app_launcher.launch(SystemApps.FILES)
+    page = FilesPage(driver)
     page.wait_until_ready()
     return page
 
