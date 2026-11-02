@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>UIAutomation Fixture</title>
+</head>
+<body>
+  <h1>UIAutomation fixture page</h1>
+  <p><a href="second.html">Go to second page</a></p>
+  <form onsubmit="return false">
+    <input aria-label="Fixture input" autocomplete="off">
+    <button type="button" onclick="document.getElementById('out').textContent = 'Echo: ' + document.querySelector('input').value">Echo</button>
+  </form>
+  <p id="out">Nothing echoed</p>
+</body>
+</html>

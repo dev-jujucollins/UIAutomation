@@ -42,6 +42,9 @@ def test_main_screens_declare_health_locators() -> None:
         "ComposeMessagePage",
         "ContactsPage",
         "MapsPage",
+        "RemindersHomePage",
+        "NewReminderPage",
+        "SafariPage",
     } <= names
 
 
