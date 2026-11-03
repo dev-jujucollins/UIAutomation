@@ -68,6 +68,9 @@ CALENDAR_LAUNCH_TIMEOUT = 30
 # WebDriverAgent launch takes over a minute, more when several start at once.
 SESSION_START_BUDGET_SECONDS = 300
 APPLE_PARK_COORDINATES = (37.3349, -122.00902)
+# Seconds WebDriverAgent waits for an app to go idle before each action (XCUITest setting).
+DEFAULT_IDLE_TIMEOUT = 10.0
+MAPS_IDLE_TIMEOUT = 1.0
 # simctl ui settings a run may change, with the option that selects each.
 DISPLAY_SETTINGS = {"appearance": "--appearance", "content_size": "--content-size"}
 # Opt-in suites that own data or guidance on one explicitly named simulator.
@@ -677,6 +680,13 @@ def maps_home(
             except TimeoutException:
                 pass
 
+    # Maps can keep animating, and XCTest then waits its full idle timeout (10 s) before
+    # every tap, which pushed two-search tests past the test timeout. Maps page objects
+    # wait for explicit state, so a short idle wait is enough. Registered first so it is
+    # restored last, after the cleanup taps below.
+    previous_idle = driver.get_settings().get("waitForIdleTimeout", DEFAULT_IDLE_TIMEOUT)
+    request.addfinalizer(lambda: driver.update_settings({"waitForIdleTimeout": previous_idle}))
+    driver.update_settings({"waitForIdleTimeout": MAPS_IDLE_TIMEOUT})
     request.addfinalizer(lambda: clear_simulator_location(udid))
     request.addfinalizer(reset_permission)
     request.addfinalizer(lambda: launcher.terminate(SystemApps.MAPS))

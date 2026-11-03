@@ -1,6 +1,6 @@
 """Maps assertions, permission decisions, and fixture ownership contracts."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -373,3 +373,42 @@ def test_navigation_cleanup_registered_before_recenter_fails() -> None:
     for finalizer in reversed(request.addfinalizer.call_args_list):
         finalizer.args[0]()
     page.end_navigation.assert_called_once()
+
+
+def test_maps_uses_a_short_idle_wait_and_restores_it_last() -> None:
+    """Maps keeps animating; the shorter idle wait must outlast every cleanup tap."""
+    request, driver, launcher = MagicMock(), MagicMock(), MagicMock()
+    request.getfixturevalue.side_effect = [driver, launcher]
+    driver.capabilities = {"udid": "test-simulator"}
+    driver.get_settings.return_value = {"waitForIdleTimeout": 7.5}
+    request.param = "deny"
+    with (
+        patch("uiautomation.utils.simulator_control.subprocess.run"),
+        patch.object(pytest_plugin.MapsPage, "wait_until_ready"),
+        patch.object(pytest_plugin.MapsPage, "close_to_home") as close_to_home,
+    ):
+        next(pytest_plugin.maps_home.__wrapped__(request, True))
+        assert driver.update_settings.call_args_list == [
+            call({"waitForIdleTimeout": pytest_plugin.MAPS_IDLE_TIMEOUT})
+        ]
+        for finalizer in reversed(request.addfinalizer.call_args_list):
+            finalizer.args[0]()
+    close_to_home.assert_called_once()
+    # The restore was registered first, so it runs after close_to_home and the resets.
+    assert driver.update_settings.call_args_list[-1] == call({"waitForIdleTimeout": 7.5})
+
+
+def test_idle_wait_is_restored_when_maps_fails_to_launch() -> None:
+    request, driver, launcher = MagicMock(), MagicMock(), MagicMock()
+    request.getfixturevalue.side_effect = [driver, launcher]
+    driver.capabilities = {"udid": "test-simulator"}
+    driver.get_settings.return_value = {}
+    launcher.launch.side_effect = RuntimeError("launch failed")
+    with patch("uiautomation.utils.simulator_control.subprocess.run"):
+        with pytest.raises(RuntimeError):
+            next(pytest_plugin.maps_home.__wrapped__(request, True))
+        for finalizer in reversed(request.addfinalizer.call_args_list):
+            finalizer.args[0]()
+    assert driver.update_settings.call_args_list[-1] == call(
+        {"waitForIdleTimeout": pytest_plugin.DEFAULT_IDLE_TIMEOUT}
+    )
