@@ -91,6 +91,17 @@ Existing framework hooks capture screenshots, UI hierarchy, and available logs
 on failure. Discovery captures are local ignored files under
 `artifacts/maps-discovery/`.
 
+## Idle waits
+
+Before each action, WebDriverAgent waits for the app to go idle, by default up to
+10 seconds (Appium's `waitForIdleTimeout`). Maps can keep animating, so on some runs
+every tap paid the full 10 seconds and `test_search_repeatability`, which does two full
+search cycles, passed the 120-second test timeout. The Appium log shows this as
+`App animations complete notification not received, will attempt to continue`.
+`maps_home` sets `waitForIdleTimeout` to 1 second for the test and restores the
+previous value afterwards. That is safe because Maps page objects wait for explicit
+state (place card, home card, search field) rather than for the app to settle.
+
 ## Later coverage
 
 P1: address result identity, manual origin editing, unavailable routes,
