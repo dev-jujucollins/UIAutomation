@@ -45,19 +45,19 @@ self-hosted, macOS, ARM64, uiautomation, xcode-27, ios-27
 Configure the runner before enabling the schedule:
 
 1. Install and select Xcode 27, complete its first-launch setup, and install the
-   iOS 27.0 simulator runtime. Ensure the runner account can run `xcodebuild` and
+   iOS 27.2 simulator runtime. Ensure the runner account can run `xcodebuild` and
    `xcrun` without interactive prompts.
 2. Install Node.js, Appium, and its XCUITest driver under the runner account.
    Keep their tested versions stable; the run manifest records installed versions.
    Appium must be on the runner service's `PATH`, which may differ from a terminal.
 3. Create one simulator named `UIAutomation CI`, using an available iPhone type
-   and iOS 27.0. Configure English UI; these app locators use English labels.
+   and iOS 27.2. Configure English UI; these app locators use English labels.
    For example, after confirming the identifiers exist:
 
    ```bash
    xcrun simctl create "UIAutomation CI" \
      com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro \
-     com.apple.CoreSimulator.SimRuntime.iOS-27-0
+     com.apple.CoreSimulator.SimRuntime.iOS-27-2
    ```
 
 4. Give the runner an active macOS user session suitable for XCUITest and network
