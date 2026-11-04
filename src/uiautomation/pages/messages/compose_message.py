@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from selenium.common.exceptions import TimeoutException
+
 from ..base_page import BasePage
 
 if TYPE_CHECKING:
@@ -22,6 +24,9 @@ class ComposeMessagePage(BasePage):
     )
 
     HEALTH_LOCATORS = ("NAVIGATION_BAR", "RECIPIENT_FIELD", "BODY_FIELD", "CANCEL_BUTTON")
+    # Tapping a text field again only re-places the cursor, so a retry is safe.
+    FOCUS_ATTEMPTS = 3
+    FOCUS_TIMEOUT = 2
 
     def wait_until_ready(self) -> None:
         """Require the native compose sheet and its editable fields."""
@@ -63,7 +68,28 @@ class ComposeMessagePage(BasePage):
         Args:
             text: Draft text, including Unicode and newlines, or empty to clear.
         """
+        self._focus_body()
         self._replace_text(self.BODY_FIELD, text)
+
+    def _focus_body(self) -> None:
+        """Move keyboard focus from To: to the message field before typing into it.
+
+        WebDriverAgent taps an unfocused field and types without checking that focus moved.
+        Late in long runs Messages sometimes ignores that tap, so the draft text was typed
+        onto the recipient. Leaving To: turns typed text into a recipient token, so raw
+        recipient text that is still there means focus has not moved yet.
+        """
+        typed = self.get_recipient()
+        if not typed or typed.startswith("To:"):
+            return  # Nothing typed, or already a token: focus is not held by To: text.
+        for _ in range(self.FOCUS_ATTEMPTS):
+            self.find_element(self.BODY_FIELD).click()
+            try:
+                self._get_wait(self.FOCUS_TIMEOUT).until(lambda _: self.get_recipient() != typed)
+                return
+            except TimeoutException:
+                continue
+        raise AssertionError("Messages kept keyboard focus in To: after tapping the message field")
 
     def _replace_text(self, locator: tuple[str, str], text: str) -> None:
         """Clear a field, optionally type text, and verify the resulting value."""

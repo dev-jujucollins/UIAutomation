@@ -44,7 +44,9 @@ def test_replace_text_clears_before_typing_and_checks_result(text: str) -> None:
     field = MagicMock()
     page.wait_for_clickable = MagicMock(return_value=field)
     page._field_value = MagicMock(return_value=text)
+    page._focus_body = MagicMock()
     page.set_body(text)
+    page._focus_body.assert_called_once_with()
     expected = [call.clear()] + ([call.send_keys(text)] if text else [])
     assert field.mock_calls == expected
     page._field_value.assert_called_with(page.BODY_FIELD)
@@ -55,6 +57,7 @@ def test_failed_text_entry_cannot_silently_pass() -> None:
     page._wait = WebDriverWait(page.driver, 0)
     page.wait_for_clickable = MagicMock()
     page._field_value = MagicMock(return_value="wrong text")
+    page._focus_body = MagicMock()
     with pytest.raises(TimeoutException):
         page.set_body("expected")
 
@@ -153,3 +156,36 @@ def test_messages_termination_registered_before_launch_failure() -> None:
     launcher.terminate.reset_mock()
     cleanup()
     launcher.terminate.assert_called_once_with(pytest_plugin.SystemApps.MESSAGES)
+
+
+def _compose_with_recipient(values: list[str]) -> tuple[ComposeMessagePage, MagicMock]:
+    """A composer whose To: field reports successive values as the body is tapped."""
+    page = ComposeMessagePage(MagicMock())
+    page._wait = WebDriverWait(page.driver, 0.01, poll_frequency=0.001)
+    page.FOCUS_TIMEOUT = 0
+    body = MagicMock()
+    page.find_element = MagicMock(return_value=body)
+    page.get_recipient = MagicMock(side_effect=values)
+    return page, body
+
+
+@pytest.mark.parametrize("recipient", ["", "To:\ufffc"])
+def test_body_focus_is_left_alone_without_raw_recipient_text(recipient: str) -> None:
+    page, body = _compose_with_recipient([recipient])
+    page._focus_body()
+    body.click.assert_not_called()
+
+
+def test_body_is_tapped_until_messages_commits_the_recipient() -> None:
+    """An ignored tap leaves raw text in To:; the retry moves focus and commits it."""
+    # Read before tapping, after the ignored first tap, then after the second tap.
+    page, body = _compose_with_recipient(["2025550123", "2025550123", "To:\ufffc"])
+    page._focus_body()
+    assert body.click.call_count == 2
+
+
+def test_body_focus_that_never_moves_fails_clearly() -> None:
+    page, body = _compose_with_recipient(["2025550123"] * 50)
+    with pytest.raises(AssertionError, match="kept keyboard focus in To:"):
+        page._focus_body()
+    assert body.click.call_count == page.FOCUS_ATTEMPTS
