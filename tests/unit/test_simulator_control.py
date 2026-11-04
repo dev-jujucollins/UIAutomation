@@ -221,9 +221,9 @@ def test_inventory_timeout_propagates_instead_of_selecting_fallback() -> None:
 def test_preferred_name_wins_on_unpinned_runtime() -> None:
     """A newer point runtime should still pick a preferred model, not the alphabetical max."""
     devices = [
-        SimulatorDevice("iPhone Air", "air", "27.2", "Shutdown", True),
-        SimulatorDevice("iPhone 18 Pro Max", "max", "27.2", "Shutdown", True),
-        SimulatorDevice("iPhone 18 Pro", "pro", "27.2", "Shutdown", True),
+        SimulatorDevice("iPhone Air", "air", "27.3", "Shutdown", True),
+        SimulatorDevice("iPhone 18 Pro Max", "max", "27.3", "Shutdown", True),
+        SimulatorDevice("iPhone 18 Pro", "pro", "27.3", "Shutdown", True),
         SimulatorDevice("iPhone 17 Pro", "old", "26.4", "Shutdown", True),
     ]
     with patch.object(simulators, "list_available_simulators", return_value=devices):
@@ -234,10 +234,23 @@ def test_iphone_18_pro_beats_other_pinned_models() -> None:
     """An unpinned iPhone 18 Pro runtime still outranks an exactly pinned older model."""
     devices = [
         SimulatorDevice("iPhone 17 Pro", "old", "26.4", "Booted", True),
-        SimulatorDevice("iPhone 18 Pro", "pro", "27.2", "Shutdown", True),
+        SimulatorDevice("iPhone 18 Pro", "pro", "27.3", "Shutdown", True),
     ]
     with patch.object(simulators, "list_available_simulators", return_value=devices):
         assert get_preferred_simulator().udid == "pro"
+
+
+def test_pinned_runtime_beats_newer_runtime_of_same_model() -> None:
+    """A newer, untested runtime must not displace the pinned one for the same model."""
+    devices = [
+        SimulatorDevice("iPhone 18 Pro", "newer", "27.3", "Shutdown", True),
+        SimulatorDevice("iPhone 18 Pro", "pinned", "27.2", "Shutdown", True),
+    ]
+    chosen, why = simulators.select_simulator(devices)
+    assert (chosen.udid, why) == (
+        "pinned",
+        "highest-ranked preferred model, on its pinned runtime",
+    )
 
 
 def test_reset_denies_contacts_after_privacy_reset() -> None:
@@ -270,8 +283,8 @@ def test_reset_denies_contacts_after_privacy_reset() -> None:
 )
 def test_selection_explains_its_choice(name, version, expected, reason) -> None:
     devices = [
-        SimulatorDevice("iPhone Air", "air", "27.2", "Booted", True),
-        SimulatorDevice("iPhone 18 Pro", "pro", "27.2", "Shutdown", True),
+        SimulatorDevice("iPhone Air", "air", "27.3", "Booted", True),
+        SimulatorDevice("iPhone 18 Pro", "pro", "27.3", "Shutdown", True),
         SimulatorDevice("iPhone 17 Pro", "old", "26.4", "Shutdown", True),
     ]
     chosen, why = simulators.select_simulator(devices, name, version)

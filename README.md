@@ -245,7 +245,7 @@ matching available iPhones, the model decides first, in this order:
 3. iPhone 16 Pro
 4. iPhone 15
 
-Within a model, its pinned runtime wins (iPhone 18 Pro / iOS 27.0, iPhone 17 Pro /
+Within a model, its pinned runtime wins (iPhone 18 Pro / iOS 27.2, iPhone 17 Pro /
 iOS 26.4, then 26.2 and 26.0, iPhone 16 Pro / iOS 18.5, iPhone 15 / iOS 17.0), then the
 newest installed runtime. If no preferred model matches, the newest runtime wins, with
 name as the tie-breaker. Parallel-run worker simulators are never chosen by default.
