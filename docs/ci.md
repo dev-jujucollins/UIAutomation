@@ -19,11 +19,9 @@ missing branches and add tests for meaningful failure paths before setting a
 future threshold. The matrix verifies Python compatibility, not iOS runtime
 compatibility.
 
-Local validation on September 28, 2026 passed all 285 unit tests on Python 3.10.0
-and 3.12.12. The 3.10 run used an isolated environment and the installed
-noneditable package. Python 3.12 coverage measured 73.58% of lines and 55.06% of
-branches. Ruff formatting/lint and Pyright passed. These local results do not
-claim that the GitHub workflows have completed.
+CI and local development both use Python 3.12, the minimum `pyproject.toml` allows.
+Run the same unit suite locally with `uv run pytest --cov`; a local pass does not
+show that the GitHub workflow has completed.
 
 ## Dedicated simulator runner
 

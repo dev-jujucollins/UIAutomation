@@ -201,24 +201,24 @@ servers still build WebDriverAgent during session start and may need `--timeout=
 
 ## Observed host configuration
 
-The following versions were inspected on September 28, 2026. These are an
+The following versions were inspected on November 4, 2026. These are an
 observed configuration, not a compatibility guarantee for every dependency
 combination or every iOS app flow:
 
 | Component | Observed version |
 | --- | --- |
 | macOS | 27.2, Apple Silicon |
-| Python | 3.12.12; unit suite also verified on 3.10.0 |
-| uv | 0.12.19 |
-| Xcode | 27.1, build 27A9269 |
-| Node.js | 26.10.0 |
-| Appium | 3.8.0 |
-| XCUITest driver | 10.43.1 |
-| Preferred simulator | iPhone 18 Pro, iOS 27.0 |
+| Python | 3.12.12 |
+| uv | 0.13.7 |
+| Xcode | 27.2, build 27B52 |
+| Node.js | 26.13.0 |
+| Appium | 3.9.0 |
+| XCUITest driver | 12.22.7 |
+| Tested simulator | iPhone 18 Pro, iOS 27.2 |
 
-Re-verified November 2, 2026 with Xcode 27.2, the XCUITest driver 12.22.7, and an
-iPhone 18 Pro on iOS 27.2: smoke, journeys, diagnostics, all five lifecycle tests, and
-Maps guidance passed. iOS 27.0 simulators are no longer required.
+On November 2, 2026, with the same Xcode and XCUITest driver, smoke, journeys,
+diagnostics, all five lifecycle tests, and Maps guidance passed on that simulator.
+iOS 27.0 simulators are no longer required.
 
 The selected developer directory was `/Applications/Xcode.app/Contents/Developer`.
 Use the following preflight and smoke run to verify a machine end to end:
