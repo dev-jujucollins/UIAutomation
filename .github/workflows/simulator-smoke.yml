@@ -20,7 +20,7 @@ jobs:
     env:
       UV_PYTHON: "3.12"
       UIAUTOMATION_SIMULATOR: UIAutomation CI
-      UIAUTOMATION_RUNTIME: "27.0"
+      UIAUTOMATION_RUNTIME: "27.2"
     steps:
       - uses: actions/checkout@v4
         with:
