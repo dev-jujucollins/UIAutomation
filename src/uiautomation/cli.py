@@ -24,6 +24,7 @@ from uiautomation.utils.simulator_control import (
     select_simulator,
     version_key,
 )
+from uiautomation.utils.swift_runner import run_swift
 
 _VALUE_OPTIONS = {
     "--device-name": "Exact simulator or physical-device name",
@@ -176,6 +177,43 @@ def main(argv: list[str] | None = None) -> int:
         "rerun", help="Re-run the latest run's failed tests on the same target", allow_abbrev=False
     )
     _add_run_options(rerun)
+    swift = commands.add_parser(
+        "swift",
+        help="Run the Swift/XCUITest suite, recorded and reported like a pytest run",
+        allow_abbrev=False,
+    )
+    swift.add_argument(
+        "tests", nargs="*", help="Test classes or Class/testMethod names (default: the plan)"
+    )
+    swift.add_argument("--plan", help="Test plan: All, Smoke, or Journey")
+    swift.add_argument("--device", "--device-name", dest="device", help="Simulator name")
+    swift.add_argument("--os", "--platform-version", dest="os_version", help="iOS version")
+    swift.add_argument("--udid", help="Exact simulator, instead of --device and --os")
+    swift.add_argument(
+        "--lifecycle",
+        "--run-lifecycle",
+        action="store_true",
+        help="Include owned-data tests (use a disposable simulator)",
+    )
+    swift.add_argument(
+        "--maps-navigation",
+        "--run-maps-navigation",
+        action="store_true",
+        help="Include Maps turn-by-turn guidance",
+    )
+    swift.add_argument(
+        "--diagnostics",
+        "--run-diagnostics",
+        action="store_true",
+        help="Include locator-health and accessibility diagnostics",
+    )
+    swift.add_argument("--artifacts-dir", type=Path, default=Path("artifacts"))
+    swift_delivery = swift.add_mutually_exclusive_group()
+    swift_delivery.add_argument("--email", action="store_true", help="Send summary and HTML report")
+    swift_delivery.add_argument(
+        "--email-preview", action="store_true", help="Write the email and report without sending"
+    )
+    swift.add_argument("--email-config", type=Path, default=Path("email.local"))
     history = commands.add_parser("history", help="Compare completed run manifests")
     history.add_argument("--artifacts-dir", type=Path, default=Path("artifacts"))
     history.add_argument("--limit", type=int, default=10)
@@ -208,7 +246,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Opt in to upstream Appium doctor (may apply fixes or start a tunnel; 60s limit)",
     )
     doctor.add_argument("--json", action="store_true", help="Print machine-readable results")
-    args = parser.parse_args(argv)
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    # "swift ... -- <xcodebuild options>": argparse would fold the tail into the test names.
+    swift_extra: list[str] = []
+    if arguments[:1] == ["swift"] and "--" in arguments:
+        split = arguments.index("--")
+        arguments, swift_extra = arguments[:split], arguments[split + 1 :]
+    args = parser.parse_args(arguments)
     if args.command == "run" or args.command in SUITES:
         forwarded = _forward_options(args)
         if any(arg == "--artifacts-dir" or arg.startswith("--artifacts-dir=") for arg in forwarded):
@@ -223,6 +267,22 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.command == "rerun":
         return _rerun(args, parser)
+    if args.command == "swift":
+        return run_swift(
+            args.tests,
+            args.artifacts_dir,
+            plan=args.plan,
+            device=args.device,
+            os_version=args.os_version,
+            udid=args.udid,
+            lifecycle=args.lifecycle,
+            maps_navigation=args.maps_navigation,
+            diagnostics=args.diagnostics,
+            email=args.email,
+            preview=args.email_preview,
+            email_config=args.email_config,
+            extra=swift_extra,
+        )
     if args.command == "history":
         if args.limit < 1:
             parser.error("--limit must be positive")

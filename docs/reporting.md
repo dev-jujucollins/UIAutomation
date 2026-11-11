@@ -192,6 +192,35 @@ If pytest fails before producing a manifest, the email reports its exit status
 without inventing test counts. Collection errors and interrupted runs may have
 incomplete summaries.
 
+### Swift (XCUITest) runs
+
+The Swift suite in `swift/` reports through the same code and the same sender setup:
+
+```bash
+uv run uiautomation swift --plan Smoke                  # record run.json and report.html
+uv run uiautomation swift --plan Smoke --email-preview  # also write email.txt and email.html
+uv run uiautomation swift RemindersTests --email        # send
+```
+
+`swift/run-tests.sh --email` and `--email-preview` do the same thing; without either
+flag the script is a plain `xcodebuild` run and records nothing.
+
+Every `uiautomation swift` run saves, under `artifacts/local-<id>/`:
+
+| File | Contents |
+| --- | --- |
+| `<run-id>/results.xcresult` | Xcode's result bundle: step logs, screen recordings, hierarchies |
+| `<run-id>/run.json` | The run in the pytest manifest shape, marked `"runner": "xcuitest"` |
+| `report.html` | One self-contained page: verdict, failures with message and screenshot, results by app, skipped tests with reasons |
+| `email.txt`, `email.html` | The summary's text and HTML bodies (email and preview runs) |
+
+Because the manifest has the pytest shape, `uiautomation history` lists Swift tests
+(as `swift::<Class>/<test>`) beside the Python ones. `uiautomation rerun` drives pytest
+and ignores Swift runs. The email carries an HTML summary with a plain-text fallback
+and attaches `report.html`. Screenshots over 2 MB are left out of the report, and a
+report over 10 MB is rebuilt without screenshots. The command exits with
+`xcodebuild`'s status whatever happens to reporting.
+
 ### Sender setup
 
 Copy `email.example.json` to `email.local` and fill in your provider's SMTP

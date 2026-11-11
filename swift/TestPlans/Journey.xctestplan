@@ -1,0 +1,38 @@
+{
+  "configurations": [
+    {
+      "id": "B04C8404-87FB-526F-AA57-AE099C4C0827",
+      "name": "Default",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {},
+  "testTargets": [
+    {
+      "target": {
+        "containerPath": "container:UIAutomationSwift.xcodeproj",
+        "identifier": "267A0A93000DC8F69D060E52",
+        "name": "UIAutomationUITests"
+      },
+      "selectedTests": [
+        "SettingsTests/testNavigateToGeneralAbout()",
+        "CalendarTests/testNavigateToMonthView()",
+        "CalendarTests/testOpenNewEvent()",
+        "CalendarTests/testEditAndCancelEventDraft()",
+        "MessagesTests/testDraftDiscardRoundTrip()",
+        "MessagesTests/testExistingConversationRoundTrip()",
+        "MapsTests/testPlaceDirectionsRoundTrip()",
+        "MapsTests/testRoutePreviewAndTravelModes()",
+        "MapsTests/testSearchRepeatability()",
+        "RemindersTests/testOpenDefaultListAndReturn()",
+        "RemindersTests/testDiscardedDraftCreatesNothing()",
+        "SafariTests/testLoadFollowLinkAndGoBack()",
+        "SafariTests/testFormInputReachesThePage()",
+        "SafariTests/testAppleComMenuToIPhoneAndBack()",
+        "PhotosTests/testOpenPhotoShowsItsDateAndReturns()",
+        "FilesTests/testBrowseOnMyIPhoneAndRecentlyDeleted()"
+      ]
+    }
+  ],
+  "version": 1
+}

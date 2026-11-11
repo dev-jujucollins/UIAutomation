@@ -1,0 +1,47 @@
+# XcodeGen spec. Regenerate the project with: cd swift && xcodegen generate
+name: UIAutomationSwift
+options:
+  bundleIdPrefix: dev.uiautomation
+  deploymentTarget:
+    iOS: "18.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    GENERATE_INFOPLIST_FILE: YES
+targets:
+  # XCUITest needs a host app to build against. The tests drive system apps, and launch
+  # this one only to import a photo for the Photos lifecycle test.
+  HostApp:
+    type: application
+    platform: iOS
+    sources: [HostApp]
+    settings:
+      base:
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: Adds one test photo for the Photos lifecycle UI test.
+  UIAutomationUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UIAutomationUITests
+      # The Python suite's Safari fixture pages, bundled as a "site" folder so both
+      # suites serve the same files.
+      - path: ../tests/integration/fixtures/site
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - target: HostApp
+schemes:
+  UIAutomationUITests:
+    build:
+      targets:
+        HostApp: all
+        UIAutomationUITests: [test]
+    test:
+      # All runs every test; Smoke and Journey match the Python suite's markers.
+      # Each plan names this target by the ID XcodeGen derives from its name.
+      testPlans:
+        - path: TestPlans/All.xctestplan
+          defaultPlan: true
+        - path: TestPlans/Smoke.xctestplan
+        - path: TestPlans/Journey.xctestplan

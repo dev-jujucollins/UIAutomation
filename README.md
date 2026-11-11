@@ -10,6 +10,9 @@ optional email summaries, reruns failures, and compares saved runs. Failures col
 screenshots, page XML, Appium logs, and matching simulator crash reports when
 available.
 
+A native Swift/XCUITest port of the device tests, with no Appium or WebDriverAgent,
+lives in [`swift/`](swift/README.md). The two suites are independent.
+
 ## Quick start
 
 From the repository root:
