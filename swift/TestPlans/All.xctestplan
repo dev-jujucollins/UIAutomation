@@ -1,0 +1,20 @@
+{
+  "configurations": [
+    {
+      "id": "17BAD564-8684-54F4-B8AE-827C7BADF6EF",
+      "name": "Default",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {},
+  "testTargets": [
+    {
+      "target": {
+        "containerPath": "container:UIAutomationSwift.xcodeproj",
+        "identifier": "267A0A93000DC8F69D060E52",
+        "name": "UIAutomationUITests"
+      }
+    }
+  ],
+  "version": 1
+}

@@ -1,0 +1,32 @@
+{
+  "configurations": [
+    {
+      "id": "EE46B69F-6241-551F-A6A5-78599BA40CDA",
+      "name": "Default",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {},
+  "testTargets": [
+    {
+      "target": {
+        "containerPath": "container:UIAutomationSwift.xcodeproj",
+        "identifier": "267A0A93000DC8F69D060E52",
+        "name": "UIAutomationUITests"
+      },
+      "selectedTests": [
+        "SettingsTests/testSettingsAppLaunches()",
+        "CalendarTests/testCalendarAppLaunches()",
+        "MessagesTests/testMessagesHomeIsReady()",
+        "MessagesTests/testOpenComposerAndCancel()",
+        "MapsTests/testLaunchAndSearchWithLocationDenied()",
+        "MapsTests/testLaunchAndSearchWithLocationAllowed()",
+        "RemindersTests/testRemindersHomeIsReady()",
+        "SafariTests/testSafariIsReady()",
+        "PhotosTests/testPhotosLibraryIsReady()",
+        "FilesTests/testFilesBrowserIsReady()"
+      ]
+    }
+  ],
+  "version": 1
+}

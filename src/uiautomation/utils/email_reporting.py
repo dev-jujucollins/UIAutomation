@@ -64,9 +64,21 @@ class EmailSettings:
 
 
 def send_summary(
-    settings: EmailSettings, subject: str, body: str, html_report: bytes | None = None
+    settings: EmailSettings,
+    subject: str,
+    body: str,
+    html_report: bytes | None = None,
+    html_body: str | None = None,
 ) -> None:
-    """Send a TLS-protected summary and optional HTML attachment without retries."""
+    """Send a TLS-protected summary and optional HTML attachment without retries.
+
+    Args:
+        settings: Nonsecret SMTP settings.
+        subject: Message subject.
+        body: Plain-text summary.
+        html_report: Optional report attached as ``report.html``.
+        html_body: Optional HTML version of the summary; ``body`` stays as the fallback.
+    """
     try:
         credential = subprocess.run(
             [
@@ -96,6 +108,8 @@ def send_summary(
     message["Date"] = formatdate(localtime=True)
     message["Message-ID"] = make_msgid()
     message.set_content(body)
+    if html_body is not None:
+        message.add_alternative(html_body, subtype="html")
     if html_report is not None:
         message.add_attachment(html_report, maintype="text", subtype="html", filename="report.html")
     context = ssl.create_default_context()
@@ -112,10 +126,28 @@ def send_summary(
         smtp.send_message(message, from_addr=settings.sender, to_addrs=[settings.recipient])
 
 
+PYTEST_EVIDENCE = "Screenshots, page XML, crash reports, and Appium logs remain on the Mac."
+
+
 def render_summary(
-    suite: str, exit_code: int, elapsed: float, manifest: dict[str, Any] | None
+    suite: str,
+    exit_code: int,
+    elapsed: float,
+    manifest: dict[str, Any] | None,
+    *,
+    exit_label: str = "Pytest exit status",
+    evidence: str = PYTEST_EVIDENCE,
 ) -> tuple[str, str]:
-    """Build a concise message without logs, credentials, or parameter values."""
+    """Build a concise message without logs, credentials, or parameter values.
+
+    Args:
+        suite: Label for what was run.
+        exit_code: Exit status using pytest's meanings (0 passed, 1 tests failed).
+        elapsed: Wall-clock seconds for the whole run.
+        manifest: The run's ``run.json`` content, if one was written.
+        exit_label: How the exit status line is introduced; other runners override it.
+        evidence: Closing line saying where failure evidence stays.
+    """
     status = {
         0: "PASSED",
         1: "FAILED",
@@ -126,7 +158,7 @@ def render_summary(
         130: "INTERRUPTED",
     }.get(exit_code, "ERROR")
     subject = f"[UIAutomation] {status} — {suite}"
-    lines = [subject, f"Pytest exit status: {exit_code}", f"Elapsed: {elapsed:.1f}s"]
+    lines = [subject, f"{exit_label}: {exit_code}", f"Elapsed: {elapsed:.1f}s"]
     if manifest is None:
         lines.append("No run manifest available. Test startup or collection may have failed.")
     else:
@@ -160,5 +192,5 @@ def render_summary(
             lines.extend(["Failed tests:", *failures[:20]])
             if len(failures) > 20:
                 lines.append(f"... {len(failures) - 20} additional failures; see local report.")
-    lines.append("Screenshots, page XML, crash reports, and Appium logs remain on the Mac.")
+    lines.append(evidence)
     return subject, "\n".join(lines) + "\n"

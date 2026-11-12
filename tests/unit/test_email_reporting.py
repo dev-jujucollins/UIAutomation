@@ -154,3 +154,41 @@ def test_missing_manifest_does_not_invent_test_counts() -> None:
     assert "USAGE ERROR" in subject
     assert "No run manifest" in body
     assert "0 passed" not in body
+
+
+def test_html_body_is_an_alternative_to_the_text_and_keeps_the_attachment(monkeypatch) -> None:
+    monkeypatch.setattr(
+        email_reporting.subprocess,
+        "run",
+        MagicMock(return_value=SimpleNamespace(stdout="secret-password\n")),
+    )
+    smtp = MagicMock()
+    constructor = MagicMock()
+    constructor.return_value.__enter__.return_value = smtp
+    monkeypatch.setattr(email_reporting.smtplib, "SMTP_SSL", constructor)
+    settings = EmailSettings(
+        "smtp.example.com", 465, "ssl", "user", "sender@example.com", "recipient@example.com"
+    )
+    send_summary(
+        settings,
+        "Summary",
+        "plain text",
+        html_report=b"<html>report</html>",
+        html_body="<p>rich</p>",
+    )
+    message = smtp.send_message.call_args.args[0]
+    assert message.get_body(preferencelist=("plain",)).get_content().strip() == "plain text"
+    assert message.get_body(preferencelist=("html",)).get_content().strip() == "<p>rich</p>"
+    (attachment,) = message.iter_attachments()
+    assert attachment.get_filename() == "report.html"
+
+
+def test_summary_wording_can_describe_another_runner() -> None:
+    _, body = render_summary(
+        "Swift · Smoke", 0, 12.0, None, exit_label="Exit status", evidence="Bundle stays local."
+    )
+    assert "Exit status: 0" in body and "Pytest" not in body
+    assert body.rstrip().endswith("Bundle stays local.")
+    # The defaults are unchanged for pytest runs.
+    _, default = render_summary("smoke", 0, 12.0, None)
+    assert "Pytest exit status: 0" in default and "Appium logs remain on the Mac." in default

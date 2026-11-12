@@ -144,7 +144,11 @@ _RERUN_FLAGS = (
 
 
 def latest_run(root: Path) -> dict[str, Any] | None:
-    """Return the most recently finished controller manifest under ``root``."""
+    """Return the most recently finished pytest controller manifest under ``root``.
+
+    Swift (XCUITest) runs are recorded in the same folder for history, but ``rerun``
+    drives pytest and cannot repeat them, so they are passed over here.
+    """
     latest: dict[str, Any] | None = None
     for path in root.rglob("run.json"):
         try:
@@ -155,6 +159,7 @@ def latest_run(root: Path) -> dict[str, Any] | None:
             isinstance(run, dict)
             and isinstance(run.get("finished_at"), str)
             and run.get("worker") is None
+            and run.get("runner", "pytest") == "pytest"
             and isinstance(run.get("results"), list)
             and (latest is None or run["finished_at"] > latest["finished_at"])
         ):
