@@ -63,6 +63,8 @@ class ReadableOutput:
     def __init__(self, config: pytest.Config) -> None:
         self.config = config
         self.area: str | None = None
+        # Setup time (launching the app) counts toward each test's shown duration.
+        self.setup: dict[str, float] = {}
         workers = config.getoption("numprocesses", default=None)
         self.parallel = bool(workers) and str(workers) != "0"
 
@@ -83,20 +85,23 @@ class ReadableOutput:
 
     def pytest_runtest_logreport(self, report: pytest.TestReport) -> None:
         reporter = self._reporter()
+        if report.when == "setup" and report.passed:
+            self.setup[report.nodeid] = report.duration
         if reporter is None or not _shown(report):
             return
+        seconds = report.duration + self.setup.pop(report.nodeid, 0.0)
         area, title = describe(report.nodeid, report.location[0])
         mark, style = MARKS.get(report.outcome, ("?", {}))
         if self.parallel:
             reporter.ensure_newline()
-            reporter.write_line(f"{mark} {area} › {title}  {report.duration:.1f}s", **style)
+            reporter.write_line(f"{mark} {area} › {title}  {seconds:.1f}s", **style)
             return
         if area != self.area:
             reporter.ensure_newline()
             reporter.write_line("")
             reporter.write_line(area, bold=True)
             self.area = area
-        reporter.write_line(f"  {mark} {title}  {report.duration:.1f}s", **style)
+        reporter.write_line(f"  {mark} {title}  {seconds:.1f}s", **style)
 
 
 def register(config: pytest.Config) -> None:
