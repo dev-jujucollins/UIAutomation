@@ -19,6 +19,7 @@ from uiautomation.utils.email_reporting import (
 )
 from uiautomation.utils.run_reporting import working_tree_dirty
 from uiautomation.utils.swift_report import render_email_html, render_report
+from uiautomation.utils.xcodebuild_output import XcodebuildProgress
 from uiautomation.utils.xcresult import (
     SwiftTest,
     build_manifest,
@@ -116,6 +117,58 @@ def _load_screenshots(bundle: Path, folder: Path, tests: list[SwiftTest]) -> dic
         return {}
 
 
+def _execute(command: list[str], log: Path, *, verbose: bool = False) -> int:
+    """Run the script, keeping xcodebuild's full output in ``log``.
+
+    The terminal gets one line per test (or the raw output with ``verbose``); compiler
+    errors are repeated in full if the build fails before any test runs.
+    """
+    progress = XcodebuildProgress(
+        lambda line: print(line, flush=True), color=sys.stdout.isatty() and not verbose
+    )
+    if not verbose:
+        print("Building… (--verbose shows xcodebuild's own output)", flush=True)
+    with log.open("w", encoding="utf-8") as output:
+        process = subprocess.Popen(  # noqa: S603
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            bufsize=1,
+        )
+        try:
+            for line in process.stdout or ():
+                output.write(line)
+                if verbose:
+                    sys.stdout.write(line)
+                else:
+                    progress.feed(line)
+            code = process.wait()
+        except KeyboardInterrupt:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+            raise
+    if verbose:
+        return code
+    tests_ran = any(progress.counts.values())
+    if tests_ran:
+        print(f"\n{progress.summary()}")
+    if code != 0 and not tests_ran:
+        if progress.build_errors:
+            print("\nBuild failed:", file=sys.stderr)
+            for error in dict.fromkeys(progress.build_errors):
+                print(f"  {error}", file=sys.stderr)
+        else:
+            print("\nxcodebuild stopped before any test ran.", file=sys.stderr)
+    if code != 0:
+        print(f"Full xcodebuild output: {log}", file=sys.stderr)
+    return code
+
+
 def run_swift(
     tests: list[str],
     artifacts: Path,
@@ -131,6 +184,7 @@ def run_swift(
     preview: bool = False,
     email_config: Path = Path("email.local"),
     extra: list[str] | None = None,
+    verbose: bool = False,
 ) -> int:
     """Run Swift tests and keep xcodebuild's exit status whatever reporting does.
 
@@ -151,6 +205,7 @@ def run_swift(
         preview: Write the summary and report without sending.
         email_config: Nonsecret SMTP settings file.
         extra: Arguments passed to xcodebuild unchanged.
+        verbose: Print xcodebuild's raw output instead of one line per test.
     """
     repository = Path.cwd()
     script = repository / RUN_SCRIPT
@@ -177,7 +232,7 @@ def run_swift(
     )
     started = monotonic()
     try:
-        code = subprocess.run(command, check=False).returncode  # noqa: S603
+        code = _execute(command, run_dir / "xcodebuild.log", verbose=verbose)
         if code < 0:
             code = 128 - code
     except KeyboardInterrupt:

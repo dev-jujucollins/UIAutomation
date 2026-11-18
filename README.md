@@ -154,9 +154,10 @@ uv run pytest tests/unit -n 2
 uv run pytest --html=report.html --self-contained-html
 ```
 
-In an interactive terminal, pytest-sugar shows a progress bar and failures as they
-happen; piped output and CI use pytest's compact output. Add `-v` for each test
-name, `-p no:sugar` for plain output, or `-o log_cli=true` for live logs.
+Results print one line per test, grouped by app, with a short failure summary and
+the failure artifacts at the end (parallel runs name the app on each line instead).
+Add `-v` for pytest's standard lines with full test IDs, `-q` for compact dots, or
+`-o log_cli=true` for live logs.
 
 `--run-integration` enables device tests; markers select them. The smoke selection
 has 10 cases: Settings, Calendar, Reminders, Safari, Photos, and Files launch;

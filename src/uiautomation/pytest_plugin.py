@@ -24,6 +24,7 @@ from uiautomation.pages.photos import PhotosLibraryPage
 from uiautomation.pages.reminders import NewReminderPage, RemindersHomePage
 from uiautomation.pages.safari import SafariPage
 from uiautomation.pages.settings import SettingsHomePage, WifiSettingsPage
+from uiautomation.utils import terminal_output
 from uiautomation.utils.app_launcher import AppLauncher
 from uiautomation.utils.appium_service import is_local_appium_url
 from uiautomation.utils.failure_artifacts import artifact_links, capture_failure
@@ -202,6 +203,7 @@ def pytest_configure(config: pytest.Config) -> None:
     )
     config.stash[RUN_REPORT] = recorder
     config.pluginmanager.register(recorder, "uiautomation-run-report")
+    terminal_output.register(config)
 
 
 @pytest.hookimpl(hookwrapper=True)

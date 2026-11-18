@@ -31,7 +31,6 @@ dev = [
     "ruff>=0.1.0",
     "pyright>=1.1.390",
     "pytest-cov>=7.1.0",
-    "pytest-sugar>=1.1.1",
 ]
 
 [tool.ruff]
@@ -82,6 +81,8 @@ log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)s] %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 addopts = "-ra --tb=short --strict-markers"
+# xunit1 keeps each test's file and line, which scripts/ci_report.py uses.
+junit_family = "xunit1"
 console_output_style = "classic"
 timeout = 120
 

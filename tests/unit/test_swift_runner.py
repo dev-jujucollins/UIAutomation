@@ -19,8 +19,8 @@ def swift_run(tmp_path: Path, monkeypatch):
     (tmp_path / "swift").mkdir()
     (tmp_path / "swift" / "run-tests.sh").write_text("#!/bin/bash\n")
     monkeypatch.chdir(tmp_path)
-    run = MagicMock(return_value=SimpleNamespace(returncode=65))
-    monkeypatch.setattr(swift_runner.subprocess, "run", run)
+    run = MagicMock(return_value=65)
+    monkeypatch.setattr(swift_runner, "_execute", run)
     monkeypatch.setattr(swift_runner, "collect_environment", lambda _: {"commit": "abc"})
     monkeypatch.setattr(
         swift_runner, "read_test_results", lambda _, kind: SUMMARY if kind == "summary" else TESTS
@@ -59,6 +59,7 @@ def test_options_translate_to_the_run_script(swift_run) -> None:
     swift_runner.run_swift(
         [],
         Path("artifacts"),
+        verbose=True,
         plan="Smoke",
         device="iPhone 18 Pro",
         os_version="27.2",
@@ -66,6 +67,7 @@ def test_options_translate_to_the_run_script(swift_run) -> None:
         diagnostics=True,
         extra=["-test-iterations", "3"],
     )
+    assert swift_run.run.call_args.kwargs["verbose"] is True
     assert swift_run.run.call_args.args[0][3:] == [
         "--plan",
         "Smoke",
@@ -169,6 +171,7 @@ def test_cli_accepts_both_option_spellings_and_xcodebuild_passthrough(monkeypatc
                 "--run-lifecycle",
                 "--diagnostics",
                 "--email-preview",
+                "--verbose",
                 "--",
                 "-test-iterations",
                 "3",
@@ -190,6 +193,7 @@ def test_cli_accepts_both_option_spellings_and_xcodebuild_passthrough(monkeypatc
         "preview": True,
         "email_config": Path("email.local"),
         "extra": ["-test-iterations", "3"],
+        "verbose": True,
     }
     with pytest.raises(SystemExit):
         cli.main(["swift", "--email", "--email-preview"])
