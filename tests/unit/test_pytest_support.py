@@ -13,68 +13,61 @@ pytest_plugins = ["pytester"]
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_sugar_progress_and_plain_output_fallback(tmp_path: Path) -> None:
-    """Sugar activates successfully; plain output preserves per-result colors."""
-    probe = tmp_path / "test_color.py"
+def _run_probe(tmp_path: Path, *options: str) -> subprocess.CompletedProcess[str]:
+    probe = tmp_path / "test_color_probe.py"
     probe.write_text(
-        "def test_failure(): assert False\ndef test_pass_after_failure(): assert True\n"
+        "import time, pytest\n"
+        "@pytest.fixture\ndef slow_launch(): time.sleep(0.6)\n"
+        "def test_failure(): assert False\n"
+        "def test_pass_after_failure(slow_launch): assert True\n"
     )
-    sugar = subprocess.run(
+    return subprocess.run(
         [
             sys.executable,
             "-m",
             "pytest",
             "-c",
             str(ROOT / "pyproject.toml"),
+            "-p",
+            "uiautomation.pytest_plugin",
             "--color=yes",
-            "--force-sugar",
+            *options,
             str(probe),
         ],
         capture_output=True,
         text=True,
         check=False,
+        cwd=tmp_path,
     )
-    assert sugar.returncode == 1
-    assert "pytest-sugar" in sugar.stdout
 
-    plain = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pytest",
-            "-c",
-            str(ROOT / "pyproject.toml"),
-            "--color=yes",
-            str(probe),
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert plain.returncode == 1
+
+def test_default_output_names_each_test_under_its_area(tmp_path: Path) -> None:
+    """One colored line per test replaces the dots and file paths."""
+    result = _run_probe(tmp_path, f"--artifacts-dir={tmp_path / 'artifacts'}")
+
+    assert result.returncode == 1
+    lines = result.stdout.splitlines()
+    assert any(line.endswith("Color probe\x1b[0m") for line in lines)
+    failure = next(line for line in lines if "✗ failure" in line)
+    passing = next(line for line in lines if "✓ pass after failure" in line)
+    assert failure.startswith("\x1b[31m\x1b[1m")
+    assert passing.startswith("\x1b[32m") and "\x1b[31m" not in passing
+    # The fixture's setup (an app launch, in real runs) counts toward the time shown.
+    assert "pass after failure  0.6s" in passing or "pass after failure  0.7s" in passing
+    assert "test_color_probe.py ." not in result.stdout
+
+
+def test_quiet_and_verbose_keep_pytest_output(tmp_path: Path) -> None:
+    """-q keeps colored dots; -v keeps pytest's per-test PASSED and FAILED words."""
+    quiet = _run_probe(tmp_path, "-q", f"--artifacts-dir={tmp_path / 'artifacts'}")
     progress_line = next(
         line
-        for line in plain.stdout.splitlines()
+        for line in quiet.stdout.splitlines()
         if "\x1b[31mF\x1b[0m" in line and "\x1b[32m.\x1b[0m" in line
     )
     assert "\x1b[31m" not in progress_line.split("\x1b[32m.\x1b[0m", 1)[1]
 
-    verbose = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pytest",
-            "-c",
-            str(ROOT / "pyproject.toml"),
-            "--color=yes",
-            "-v",
-            str(probe),
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert verbose.returncode == 1
+    verbose = _run_probe(tmp_path, "-v", f"--artifacts-dir={tmp_path / 'artifacts'}")
     pass_line = next(
         line for line in verbose.stdout.splitlines() if "test_pass_after_failure " in line
     )

@@ -29,6 +29,9 @@ watch. Or open `UIAutomationSwift.xcodeproj` in Xcode, pick a test plan, and pre
 uv run uiautomation swift --plan Smoke        # from the repo root: record without email
 ```
 
+The CLI prints one line per test, grouped by app, and keeps xcodebuild's full output in
+`xcodebuild.log` in the run folder (`--verbose` prints it as it runs).
+
 These go through the Python CLI, which runs the tests, reads Xcode's result bundle, and
 writes `run.json` and a self-contained `report.html` under `../artifacts/local-<id>/`.
 Email uses the same sender setup as the Python suite, and `uiautomation history` covers

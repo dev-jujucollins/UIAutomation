@@ -207,6 +207,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Include locator-health and accessibility diagnostics",
     )
+    swift.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print xcodebuild's raw output instead of one line per test",
+    )
     swift.add_argument("--artifacts-dir", type=Path, default=Path("artifacts"))
     swift_delivery = swift.add_mutually_exclusive_group()
     swift_delivery.add_argument("--email", action="store_true", help="Send summary and HTML report")
@@ -282,6 +287,7 @@ def main(argv: list[str] | None = None) -> int:
             preview=args.email_preview,
             email_config=args.email_config,
             extra=swift_extra,
+            verbose=args.verbose,
         )
     if args.command == "history":
         if args.limit < 1:

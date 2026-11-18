@@ -210,6 +210,7 @@ Every `uiautomation swift` run saves, under `artifacts/local-<id>/`:
 | File | Contents |
 | --- | --- |
 | `<run-id>/results.xcresult` | Xcode's result bundle: step logs, screen recordings, hierarchies |
+| `<run-id>/xcodebuild.log` | xcodebuild's full output |
 | `<run-id>/run.json` | The run in the pytest manifest shape, marked `"runner": "xcuitest"` |
 | `report.html` | One self-contained page: verdict, failures with message and screenshot, results by app, skipped tests with reasons |
 | `email.txt`, `email.html` | The summary's text and HTML bodies (email and preview runs) |
@@ -220,6 +221,10 @@ and ignores Swift runs. The email carries an HTML summary with a plain-text fall
 and attaches `report.html`. Screenshots over 2 MB are left out of the report, and a
 report over 10 MB is rebuilt without screenshots. The command exits with
 `xcodebuild`'s status whatever happens to reporting.
+
+While it runs, the terminal shows one line per test, grouped by app, with skip reasons
+and failure messages under their tests. If the build fails before any test runs, the
+compiler errors are printed instead. `--verbose` prints xcodebuild's own output.
 
 ### Sender setup
 

@@ -26,6 +26,9 @@ jobs:
           --cov=uiautomation --cov-branch --cov-report=term-missing
           --cov-report=xml:reports/coverage.xml --cov-report=html:reports/coverage
           --junitxml=reports/unit.xml --html=reports/unit.html --self-contained-html
+      - name: Summarize results
+        if: ${{ !cancelled() }}
+        run: uv run --no-editable python scripts/ci_report.py --summary "$GITHUB_STEP_SUMMARY" reports/*.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with:

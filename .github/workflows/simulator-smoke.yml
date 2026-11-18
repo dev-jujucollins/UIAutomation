@@ -42,6 +42,9 @@ jobs:
           --device-name "$UIAUTOMATION_SIMULATOR" --platform-version "$UIAUTOMATION_RUNTIME"
           --timeout=600 --artifacts-dir=artifacts
           --junitxml=reports/simulator.xml --html=reports/simulator.html --self-contained-html
+      - name: Summarize results
+        if: ${{ !cancelled() }}
+        run: uv run --no-editable python scripts/ci_report.py --summary "$GITHUB_STEP_SUMMARY" reports/*.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with:
